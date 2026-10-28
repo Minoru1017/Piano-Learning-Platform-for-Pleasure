@@ -1,19 +1,20 @@
 import type {
   Arrangement,
   BpmSource,
+  ExtractMode,
   NoteEvent,
   NoteRole,
   StemCharacterization,
 } from '../types/music'
 import { clampMidi } from '../lib/notes'
+import {
+  enforceMonophonicRhEvents,
+  selectMonophonicRaw,
+  type RawPitchNote,
+} from './monophonic'
 import { gateNotesForRole } from './stemCharacterize'
 
-export interface RawPitchNote {
-  startTimeSeconds: number
-  durationSeconds: number
-  pitchMidi: number
-  amplitude: number
-}
+export type { RawPitchNote }
 
 const RH_LO = 48 // C3
 const RH_HI = 84 // C6
@@ -41,60 +42,6 @@ function estimateBpmFromOnsets(notes: RawPitchNote[], durationSec: number): numb
 
 function quantizeBeat(beat: number, grid = 0.25): number {
   return Math.round(beat / grid) * grid
-}
-
-/** Prefer the strongest overlapping note in a time window (melody line). */
-function monophonicMelody(notes: RawPitchNote[]): RawPitchNote[] {
-  const melodic = notes
-    .filter((n) => n.pitchMidi >= RH_LO && n.pitchMidi <= RH_HI && n.durationSeconds >= 0.05)
-    .sort((a, b) => a.startTimeSeconds - b.startTimeSeconds || b.amplitude - a.amplitude)
-
-  const kept: RawPitchNote[] = []
-  for (const n of melodic) {
-    const end = n.startTimeSeconds + n.durationSeconds
-    const conflict = kept.find((k) => {
-      const kEnd = k.startTimeSeconds + k.durationSeconds
-      return n.startTimeSeconds < kEnd - 0.02 && end > k.startTimeSeconds + 0.02
-    })
-    if (!conflict) {
-      kept.push(n)
-      continue
-    }
-    const score = (x: RawPitchNote) => x.amplitude * 2 + (x.pitchMidi - RH_LO) * 0.01
-    if (score(n) > score(conflict)) {
-      kept.splice(kept.indexOf(conflict), 1, n)
-    }
-  }
-  return kept
-}
-
-function monophonicMelodyPreferVocal(notes: RawPitchNote[]): RawPitchNote[] {
-  const VOCAL_LO = 55
-  const VOCAL_HI = 76
-  const melodic = notes
-    .filter((n) => n.pitchMidi >= RH_LO && n.pitchMidi <= RH_HI && n.durationSeconds >= 0.05)
-    .sort((a, b) => a.startTimeSeconds - b.startTimeSeconds || b.amplitude - a.amplitude)
-
-  const kept: RawPitchNote[] = []
-  const score = (x: RawPitchNote) => {
-    const inVocal = x.pitchMidi >= VOCAL_LO && x.pitchMidi <= VOCAL_HI ? 1.35 : 1
-    return x.amplitude * 2 * inVocal + (x.pitchMidi - RH_LO) * 0.005
-  }
-  for (const n of melodic) {
-    const end = n.startTimeSeconds + n.durationSeconds
-    const conflict = kept.find((k) => {
-      const kEnd = k.startTimeSeconds + k.durationSeconds
-      return n.startTimeSeconds < kEnd - 0.02 && end > k.startTimeSeconds + 0.02
-    })
-    if (!conflict) {
-      kept.push(n)
-      continue
-    }
-    if (score(n) > score(conflict)) {
-      kept.splice(kept.indexOf(conflict), 1, n)
-    }
-  }
-  return kept
 }
 
 function lhRootsFromNotes(
@@ -272,6 +219,8 @@ export interface ArrangeOptions {
   stems?: StemCharacterization
   /** Raw-file silence before music (informational; audio may already be trimmed). */
   musicStartOffsetSec?: number
+  /** Easy today; medium/hard reserved. */
+  extractMode?: ExtractMode
 }
 
 /**
@@ -321,17 +270,20 @@ export function arrangeDirectionBParts(opts: ArrangeOptions): Arrangement {
   }
 
   const presence = opts.stems
+  const extractMode: ExtractMode = opts.extractMode ?? 'easy'
   const rhGated = gateNotesForRole(
     rhSource,
     rhRole,
     presence ? (rhRole === 'vocal' ? presence.vocal.presence : presence.melody.presence) : 0.6,
   )
-  const melody = opts.preferVocalRange
-    ? monophonicMelodyPreferVocal(rhGated.length ? rhGated : rhSource)
-    : monophonicMelody(rhGated.length ? rhGated : rhSource)
+  // Easy: strict monophonic RH — pick one line, then re-enforce after quantize.
+  const melody = selectMonophonicRaw(
+    rhGated.length ? rhGated : rhSource,
+    !!opts.preferVocalRange,
+  )
   const secondsPerBeat = 60 / bpm
 
-  const rh: NoteEvent[] = melody.map((n) => {
+  const rhRaw: NoteEvent[] = melody.map((n) => {
     const startBeat = quantizeBeat(n.startTimeSeconds / secondsPerBeat)
     const durBeats = Math.max(0.25, quantizeBeat(n.durationSeconds / secondsPerBeat))
     return {
@@ -342,6 +294,8 @@ export function arrangeDirectionBParts(opts: ArrangeOptions): Arrangement {
       role: rhRole,
     }
   })
+  // Collapse same-beat / post-quantize overlaps on primary RH
+  const rh = enforceMonophonicRhEvents(rhRaw).filter((n) => n.hand === 'rh')
 
   const lastBeat = Math.max(
     4,
@@ -358,6 +312,7 @@ export function arrangeDirectionBParts(opts: ArrangeOptions): Arrangement {
   )
   const lh = lhRootsFromNotes(bassGated.length ? bassGated : lhSource, bpm, measureCount, 'bass')
 
+  // Easy: sparse optional harmony; ornaments generated but muted by default in UI.
   const harmony =
     (presence?.harmony.presence ?? 0.4) >= 0.25
       ? sparseHarmonyNotes(mixSource, bpm, measureCount, rh)
@@ -367,17 +322,21 @@ export function arrangeDirectionBParts(opts: ArrangeOptions): Arrangement {
       ? ornamentNotes(mixSource, bpm, rh)
       : []
 
+  // Final: primary RH + optional RH extras never overlap (Easy rule).
+  const allNotes = enforceMonophonicRhEvents([...lh, ...rh, ...harmony, ...ornaments])
+
   return {
     title: opts.title,
     bpm,
     bpmSource,
     beatsPerMeasure: 4,
     measureCount,
-    notes: [...lh, ...rh, ...harmony, ...ornaments],
+    notes: allNotes,
     analyzer: opts.analyzer,
     sourceDurationSec: opts.sourceDurationSec,
     musicStartOffsetSec: opts.musicStartOffsetSec ?? 0,
     analyzerNote: opts.analyzerNote,
     stems: opts.stems,
+    extractMode,
   }
 }

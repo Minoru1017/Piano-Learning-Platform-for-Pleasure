@@ -171,6 +171,7 @@ export async function analyzeRecordingBasicPitch(
     bpm: bpmResult.bpm,
     bpmSource: bpmResult.source,
     stems,
-    analyzerNote: `${onsetNote}${srcLabel}；BPM ${bpmResult.bpm}（信心 ${bpmResult.confidence.toFixed(2)}）。分層為頻段／中置／暫態啟發式（非 Demucs）：${stemBrief}。混音特徵僅作進譜閘，非專業分軌；點綴預設關閉。`,
+    extractMode: 'easy',
+    analyzerNote: `${onsetNote}采音模式：簡易（Easy）— 右手嚴格單音、無重疊。${srcLabel}；BPM ${bpmResult.bpm}（信心 ${bpmResult.confidence.toFixed(2)}）。分層為頻段／中置／暫態啟發式（非 Demucs）：${stemBrief}。點綴預設關閉。`,
   })
 }

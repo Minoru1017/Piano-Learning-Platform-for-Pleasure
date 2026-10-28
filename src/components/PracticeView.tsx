@@ -14,7 +14,7 @@ import {
   upcomingNotes,
 } from '../lib/timing'
 import type { Arrangement, LoopRange, NoteRole } from '../types/music'
-import { DEFAULT_LAYER_MUTE, ROLE_LABEL_ZH } from '../types/music'
+import { DEFAULT_LAYER_MUTE, EXTRACT_MODE_LABEL_ZH, ROLE_LABEL_ZH } from '../types/music'
 import { PianoKeyboard, type KeyHighlight } from './PianoKeyboard'
 import { SoftEqCurve } from './SoftEqCurve'
 
@@ -247,6 +247,14 @@ export function PracticeView({ arrangement, onRestart, onAtmosphere }: PracticeV
           <p className="brand brand--inline">跟彈</p>
           <h1 className="practice-title">{arrangement.title}</h1>
           <p className="practice-sub">
+            <span
+              className="mode-badge"
+              title="簡易：右手嚴格單音（不重疊）、左手根音；點綴預設關。中等／進階尚未開放。"
+            >
+              采音 {EXTRACT_MODE_LABEL_ZH[arrangement.extractMode ?? 'easy']}
+              <span className="mode-badge__en">Easy</span>
+            </span>
+            <span className="dot">·</span>
             <span className="bpm-badge" title={bpmLabel || undefined}>
               {arrangement.bpm} BPM
             </span>
@@ -277,8 +285,7 @@ export function PracticeView({ arrangement, onRestart, onAtmosphere }: PracticeV
             </p>
           )}
           <p className="stem-copy">
-            白鋼琴旁跟彈：環境光霧會隨當下音符情緒（音高／分層）輕輕變化。分層為 best-effort
-            特徵化，非專業分軌。
+            采音模式「簡易（Easy）」：右手同一時間只采一個音（不重疊）；左手強拍根音；點綴預設關閉。環境光霧會隨當下音符輕輕變化。
           </p>
         </div>
         <button type="button" className="btn btn--ghost btn--small" onClick={onRestart}>
