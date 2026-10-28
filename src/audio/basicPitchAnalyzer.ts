@@ -12,6 +12,7 @@ import * as tf from '@tensorflow/tfjs'
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm'
 import type { Arrangement } from '../types/music'
 import { arrangeDirectionB, type RawPitchNote } from './arrangeFromPitch'
+import { toBasicPitchAudioBuffer } from './resample'
 
 let backendReady: Promise<void> | null = null
 let modelPromise: Promise<BasicPitch> | null = null
@@ -71,13 +72,17 @@ export async function analyzeRecordingBasicPitch(
   const audio = await decodeBlob(blob)
   const durationSec = audio.duration || durationSecFallback
 
+  // Mic capture is often 44100/48000; BasicPitch.evaluateModel requires mono @ 22050.
+  onProgress?.(0.18, '重採樣至 22050 Hz（單聲道）…')
+  const bpInput = toBasicPitchAudioBuffer(audio)
+
   const frames: number[][] = []
   const onsets: number[][] = []
   const contours: number[][] = []
 
   onProgress?.(0.2, 'Basic Pitch 推論中…')
   await model.evaluateModel(
-    audio,
+    bpInput,
     (f, o, c) => {
       frames.push(...f)
       onsets.push(...o)
