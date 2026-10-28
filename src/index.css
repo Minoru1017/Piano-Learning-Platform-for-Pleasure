@@ -282,6 +282,51 @@ input {
   margin-bottom: 0.25rem;
 }
 
+.capture-checklist {
+  margin: 0;
+  padding: 0.75rem 0.9rem 0.75rem 1.6rem;
+  max-width: 28rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-deep);
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  backdrop-filter: blur(8px);
+}
+
+.capture-checklist li + li {
+  margin-top: 0.25rem;
+}
+
+.capture-retry {
+  width: 100%;
+  max-width: 28rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(154, 74, 74, 0.28);
+  border-radius: var(--radius);
+  background: rgba(255, 248, 248, 0.85);
+  box-shadow: var(--shadow-glass);
+}
+
+.capture-retry__title {
+  margin: 0 0 0.45rem;
+  color: var(--danger);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.capture-retry__lead {
+  margin: 0 0 0.55rem;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.capture-retry .capture-checklist {
+  margin-bottom: 0.85rem;
+  max-width: none;
+}
+
 .record-layout {
   display: grid;
   gap: 2rem;
