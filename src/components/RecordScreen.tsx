@@ -62,6 +62,7 @@ export function RecordScreen({ onRecorded, onLoadDemo }: RecordScreenProps) {
   return (
     <section className="screen screen--record">
       <div className="brand-block">
+        <p className="atelier-mark">Florence · Cristofori atelier</p>
         <p className="brand">跟彈</p>
         <h1 className="headline">錄一段，立刻能跟</h1>
         <p className="lede">

@@ -31,7 +31,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app app--cristofori" data-theme="cristofori-workshop">
       <div className="atmosphere" aria-hidden />
       <main className="shell">
         {phase === 'record' && (
