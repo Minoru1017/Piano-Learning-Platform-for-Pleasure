@@ -1,2 +1,69 @@
-# -
-此產品作為興趣學鋼琴做使用 製作原因：不想花錢上鋼琴課，但聽到自己喜歡的會用鋼琴彈單音 我的特質：看不懂譜（或忘記了），但聽音樂抓單音算準，可能有絕對音感。 練習順位： 1.彈會我喜歡的歌曲 2.建立每天20分鐘的彈鋼琴習慣 3.打穩鋼琴基礎，譜也要會看
+# 跟彈 — 極簡雙手鋼琴跟彈（MVP 網頁原型）
+
+興趣學琴用的跟彈原型：**麥克風錄音 → 辨歌名 → 從同一段錄音抽出右手旋律＋左手根音 → 以小節循環跟彈**。  
+對錯偵測、帳號、串流抓完整曲、可出版 PDF **都不在 v1**。
+
+產品規格見專案文件（Agent Store）：`docs/mvp-spec.md`。
+
+## 怎麼跑
+
+```bash
+npm install
+npm run dev
+```
+
+瀏覽器打開終端機顯示的本機網址（預設 `http://localhost:5173`）。  
+需允許**麥克風權限**才能走完整流程。
+
+```bash
+npm run build    # 型別檢查 + 正式建置
+npm run preview  # 預覽建置結果
+```
+
+## 核心迴圈（UI）
+
+1. **錄音** — 錄 10–30 秒正在聽／哼的片段  
+2. **辨歌名** — 顯示建議歌名（可手動改）  
+3. **抽出** — 用**同一段錄音**產出 RH 單音旋律＋LH 強拍根音  
+4. **跟彈** — 大虛擬鍵盤高亮；選 N 小節循環、放慢、RH/LH 靜音；譜面可關  
+5. **習慣** — 可選「今天練完這段了嗎？」
+
+## 什麼是真的、什麼是 stub
+
+| 能力 | 狀態 |
+| --- | --- |
+| 麥克風錄音（MediaRecorder） | **真實** |
+| 歌曲指紋／辨歌 API | **Stub** — 隨機建議歌名＋可編輯；清楚標註待接 ACRCloud / AudD / Shazam 等 |
+| 音高 → RH/LH 編曲 | **Demo 分析器** — Web Audio 粗估 BPM／音高種子後，量化產出符合方向 B 的可練編曲（非 Basic Pitch） |
+| 虛擬鍵盤跟彈、循環、放慢、RH/LH、習慣勾選 | **真實 UI／邏輯** |
+| 預覽音色 | 簡易 Web Audio 合成（非真實鋼琴採樣） |
+| 對錯偵測 | **不做（v1）** |
+| 串流抓完整曲／PDF | **不做（v1）** |
+
+Stub 入口：
+
+- `src/audio/songIdStub.ts` — 歌名辨識  
+- `src/audio/demoAnalyzer.ts` — 旋律／根音抽出  
+
+## 換成 Basic Pitch（路徑）
+
+1. 加入 Basic Pitch WASM／ONNX（或伺服端推論）依賴。  
+2. 在 `demoAnalyzer.ts` 同層新增例如 `basicPitchAnalyzer.ts`，輸入 `Blob`／`AudioBuffer`，輸出相同的 `Arrangement`（`src/types/music.ts`）。  
+3. 規則後處理：RH 同時間最多 1 音；LH **僅**強拍根音（每小節 1–2）；量化到拍點。  
+4. 在 `IdentifyScreen` 改呼叫新分析器，並把 `arrangement.analyzer` 設為 `'basic-pitch'`。  
+5. 無 API／模型時保留 demo 降級，勿擋住跟彈迴圈。
+
+## 技術
+
+- Vite + React 19 + TypeScript  
+- 純前端；無後端、無帳號  
+
+## CI／Deploy
+
+- MVP **不需要** AWS ECS。  
+- `.github/workflows/aws.yml` 已改為 **僅 `workflow_dispatch`（手動）**，不再在 push／PR 執行，也不再使用 `MY_*` 佔位值。  
+- 日後若要 ECS：先備妥 Dockerfile、task definition，再於 repo Variables／Secrets 填入 `AWS_REGION`、`ECR_REPOSITORY`、`ECS_*`、`CONTAINER_NAME` 與 AWS access key（見該 workflow 註解）。
+
+## 授權注意
+
+本原型只處理**使用者自己的麥克風錄音**，不會去抓串流完整曲。商用辨歌 API 與曲庫授權需另評估。
