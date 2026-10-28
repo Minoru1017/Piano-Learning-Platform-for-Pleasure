@@ -20,6 +20,8 @@ export interface Arrangement {
   notes: NoteEvent[]
   /** Source of pitch extraction for UI honesty. */
   analyzer: 'demo' | 'basic-pitch'
+  /** Traditional Chinese note shown in practice UI (honest labeling). */
+  analyzerNote?: string
   /** Seconds of source recording used. */
   sourceDurationSec: number
 }

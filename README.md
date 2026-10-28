@@ -90,9 +90,9 @@ VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pag
 
 | 能力 | 狀態 |
 | --- | --- |
-| 麥克風錄音（MediaRecorder） | **真實** |
+| 麥克風錄音（MediaRecorder） | **真實**（音樂取向：關通話 DSP；錄音後峰值正規化） |
 | 歌曲指紋／辨歌 | **AudD 經 Worker**（需你部署＋設 `VITE_AUDD_PROXY_URL`）；否則 **stub**；**歌名永遠可手動改** |
-| 音高 → RH/LH 編曲 | **Demo 分析器** — Web Audio 粗估 BPM／音高種子後，量化產出符合方向 B 的可練編曲（非 Basic Pitch） |
+| 音高 → RH/LH 編曲 | **Basic Pitch（瀏覽器 TFJS WASM）** → 收成 RH 單音＋LH 強拍根音；失敗則 **示範分析器**並在 UI 標示 |
 | 虛擬鍵盤跟彈、循環、放慢、RH/LH、習慣勾選 | **真實 UI／邏輯** |
 | 預覽音色 | 簡易 Web Audio 合成（非真實鋼琴採樣） |
 | 對錯偵測 | **不做（v1）** |
@@ -102,16 +102,11 @@ VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pag
 
 - `workers/audd-proxy/` — Cloudflare Worker  
 - `src/audio/songIdentify.ts` — 前端辨識（AudD → stub 降級）  
-- `src/audio/songIdStub.ts` — stub  
-- `src/audio/demoAnalyzer.ts` — 旋律／根音抽出  
+- `src/audio/analyzeRecording.ts` / `basicPitchAnalyzer.ts` / `arrangeFromPitch.ts` — 轉譜  
+- `src/audio/demoAnalyzer.ts` — 降級示範分析器  
+- `public/basic-pitch/` · `public/tfjs-wasm/` — 模型與 WASM  
 
-## 換成 Basic Pitch（路徑）
-
-1. 加入 Basic Pitch WASM／ONNX（或伺服端推論）依賴。  
-2. 在 `demoAnalyzer.ts` 同層新增例如 `basicPitchAnalyzer.ts`，輸入 `Blob`／`AudioBuffer`，輸出相同的 `Arrangement`（`src/types/music.ts`）。  
-3. 規則後處理：RH 同時間最多 1 音；LH **僅**強拍根音（每小節 1–2）；量化到拍點。  
-4. 在 `IdentifyScreen` 改呼叫新分析器，並把 `arrangement.analyzer` 設為 `'basic-pitch'`。  
-5. 無 API／模型時保留 demo 降級，勿擋住跟彈迴圈。
+**準度提醒：** 密集混音、遠距喇叭錄音仍容易跟原曲有出入；MVP 優先「能跟彈的極簡雙手」，不是出版級轉譜。
 
 ## 技術
 
