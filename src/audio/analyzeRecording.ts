@@ -13,15 +13,23 @@ export async function analyzeRecording(
   title: string,
   durationSec: number,
   onProgress?: AnalyzeProgress,
+  musicStartOffsetSec = 0,
 ): Promise<Arrangement> {
   try {
-    return await analyzeRecordingBasicPitch(blob, title, durationSec, onProgress)
+    return await analyzeRecordingBasicPitch(
+      blob,
+      title,
+      durationSec,
+      onProgress,
+      musicStartOffsetSec,
+    )
   } catch (e) {
     const reason = e instanceof Error ? e.message : '未知錯誤'
     onProgress?.(0.5, `Basic Pitch 失敗，改用示範分析器…（${reason}）`)
     const demo = await analyzeRecordingDemo(blob, title, durationSec)
     return {
       ...demo,
+      musicStartOffsetSec,
       analyzerNote: `Basic Pitch 無法使用（${reason}）。目前為示範分析器：不會忠實跟錄音音高，請當跟彈流程測試。`,
     }
   }

@@ -127,7 +127,7 @@ export async function analyzeRecordingDemo(
   const rand = mulberry32(hashSeed(durationSec, pitchClass, title))
 
   // Target ~20 min habit chunk → practice a short loopable excerpt first.
-  const measureCount = Math.min(16, Math.max(8, Math.round(durationSec / 2)))
+  const measureCount = Math.min(480, Math.max(8, Math.round(durationSec / 2)))
   const notes: NoteEvent[] = []
 
   let degree = 0

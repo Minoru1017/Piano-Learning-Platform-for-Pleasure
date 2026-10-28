@@ -270,6 +270,8 @@ export interface ArrangeOptions {
   bpm?: number
   bpmSource?: BpmSource
   stems?: StemCharacterization
+  /** Raw-file silence before music (informational; audio may already be trimmed). */
+  musicStartOffsetSec?: number
 }
 
 /**
@@ -346,7 +348,8 @@ export function arrangeDirectionBParts(opts: ArrangeOptions): Arrangement {
     ...rh.map((n) => n.startBeat + n.durationBeats),
     opts.sourceDurationSec / secondsPerBeat || 4,
   )
-  const measureCount = Math.min(16, Math.max(4, Math.ceil(lastBeat / 4)))
+  // Full-song capture: allow long grids (12 min @ ~60 BPM ≈ 180 bars; headroom to 480).
+  const measureCount = Math.min(480, Math.max(4, Math.ceil(lastBeat / 4)))
 
   const bassGated = gateNotesForRole(
     lhSource,
@@ -373,6 +376,7 @@ export function arrangeDirectionBParts(opts: ArrangeOptions): Arrangement {
     notes: [...lh, ...rh, ...harmony, ...ornaments],
     analyzer: opts.analyzer,
     sourceDurationSec: opts.sourceDurationSec,
+    musicStartOffsetSec: opts.musicStartOffsetSec ?? 0,
     analyzerNote: opts.analyzerNote,
     stems: opts.stems,
   }

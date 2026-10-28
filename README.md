@@ -1,6 +1,6 @@
 # 跟彈 — 極簡雙手鋼琴跟彈（MVP 網頁原型）
 
-興趣學琴用的跟彈原型：**麥克風錄音 → 辨歌名 → 從同一段錄音抽出右手旋律＋左手根音 → 以小節循環跟彈**。  
+興趣學琴用的跟彈原型：**麥克風或螢幕／分頁音訊錄音 → 辨歌名 → 從同一段（清潔後）錄音抽出右手旋律＋左手根音 → 以小節循環跟彈**。  
 對錯偵測、帳號、串流抓完整曲、可出版 PDF **都不在 v1**。
 
 產品規格見專案文件（Agent Store）：`docs/mvp-spec.md`。
@@ -41,8 +41,8 @@ npm run preview      # 預覽 dist/
 
 ## 核心迴圈（UI）
 
-1. **錄音** — 錄 10–30 秒正在聽／哼的片段  
-2. **辨歌名** — 顯示建議歌名（可手動改）  
+1. **錄音** — 麥克風或螢幕／分頁音訊；可錄完整曲（上限 12 分）；自動裁靜音／底噪，小節 1＝音樂起點  
+2. **辨歌名** — 顯示建議歌名（可手動改；AudD 用開頭短片段）   
 3. **抽出** — 用**同一段錄音**產出 RH 單音旋律＋LH 強拍根音  
 4. **跟彈** — 大虛擬鍵盤高亮；選 N 小節循環、放慢、RH/LH 靜音；譜面可關  
 5. **習慣** — 可選「今天練完這段了嗎？」
@@ -90,7 +90,7 @@ VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pag
 
 | 能力 | 狀態 |
 | --- | --- |
-| 麥克風錄音（MediaRecorder） | **真實**（音樂取向：關通話 DSP；錄音後峰值正規化） |
+| 麥克風／螢幕分頁音訊 | **真實**（關通話 DSP；清潔 onset＋閘；峰值正規化；上限 12 分） |
 | 歌曲指紋／辨歌 | **AudD 經 Worker**（需你部署＋設 `VITE_AUDD_PROXY_URL`）；否則 **stub**；**歌名永遠可手動改** |
 | 音高 → 分層鋼琴 | **BPM**（自相關）＋ **Basic Pitch**；分層特徵 BASS／人聲／主旋律／和聲／點綴（非 Demucs）；預設 RH＝人聲或主旋律、LH＝BASS；點綴預設關；失敗 → **示範分析器** |
 | 虛擬鍵盤跟彈、循環、放慢、RH/LH、層開關、習慣勾選 | **真實 UI／邏輯** |
@@ -104,6 +104,7 @@ VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pag
 - `src/audio/songIdentify.ts` — 前端辨識（AudD → stub 降級）  
 - `src/audio/analyzeRecording.ts` / `basicPitchAnalyzer.ts` / `arrangeFromPitch.ts` — 轉譜  
 - `src/audio/bpm.ts` / `stemCharacterize.ts` / `vocalPrefer.ts` — BPM＋分層特徵  
+- `src/audio/recorder.ts` / `cleanCapture.ts` — 麥克風／分頁音訊＋onset 清潔  
 - `src/audio/demoAnalyzer.ts` — 降級示範分析器  
 - `public/basic-pitch/` · `public/tfjs-wasm/` — 模型與 WASM  
 

@@ -62,6 +62,7 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
           setAnalyzePct(pct)
           setAnalyzeLabel(label)
         },
+        recording.musicStartOffsetSec ?? 0,
       )
       onReady(arrangement)
     } catch (e) {
@@ -101,6 +102,17 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
             if (el) el.volume = 1
           }}
         />
+        <p className="record-meta">
+          來源：{recording.captureMode === 'display' ? '螢幕／分頁音訊' : '麥克風'}
+          {recording.musicStartOffsetSec > 0.05
+            ? ` · 已裁切開頭靜音 ${recording.musicStartOffsetSec.toFixed(1)}s（小節 1＝音樂起點）`
+            : ' · 小節 1＝音樂起點'}
+          {' · '}
+          音樂長度 {recording.durationSec.toFixed(1)}s
+          {recording.rawDurationSec > recording.durationSec + 0.2
+            ? `（原始 ${recording.rawDurationSec.toFixed(1)}s）`
+            : ''}
+        </p>
         {recording.normalizeGain != null && recording.normalizeGain > 1.05 && (
           <p className="record-meta">
             已將預覽音量峰值正規化（×{recording.normalizeGain.toFixed(1)}）；錄音仍關閉通話降噪／AGC。
