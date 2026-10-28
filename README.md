@@ -7,16 +7,21 @@
 
 ## 線上預覽（GitHub Pages）
 
-預期網址：
-
 **https://minoru1017.github.io/Piano-Learning-Platform-for-Pleasure/**
 
-（repo：`Minoru1017/Piano-Learning-Platform-for-Pleasure`；Vite `base` 已設為 `/Piano-Learning-Platform-for-Pleasure/`。）
+### 為什麼曾出現空白頁？
 
-合併到 `main` 後，Actions 工作流程 **Deploy GitHub Pages** 會建置並部署。  
-**第一次**請到 repo **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**（若尚未選）。之後 push `main` 會自動更新站點。
+Pages 曾設成 **Deploy from branch → `main` → `/`**，直接端出 **Vite 原始** `index.html`（`<script src="/src/main.tsx">`）。瀏覽器無法執行 `.tsx` → `#root` 空白。
 
-本 app 無 client router（單頁狀態切換），不需 `404.html`／hash router。
+### 現在怎麼修
+
+- Vite 專案入口改在 `src/`；`npm run build:pages` 會把 **production `dist/`** 同步到 repo 根目錄的 `index.html` + `assets/`（給 legacy Pages 用）。
+- 根目錄那些檔是**建置產物**；改 UI 請編 `src/`，再跑 `npm run build:pages`。
+- Actions `pages.yml`：建置 → 驗證 HTML 不含 `/src/main.tsx` → 同步根目錄 → 若 Settings 已選 **GitHub Actions** 再 `deploy-pages`。
+
+可選（建議）：**Settings → Pages → Source → GitHub Actions**（一次即可）。即使維持 branch `main` `/`，根目錄 production 檔也應可開站。
+
+本 app 無 client router，不需 `404.html`／hash router。
 
 ## 怎麼跑（本機）
 
@@ -29,8 +34,9 @@ npm run dev
 需允許**麥克風權限**才能走完整流程。
 
 ```bash
-npm run build    # 型別檢查 + 正式建置（含 Pages base path）
-npm run preview  # 預覽建置結果
+npm run build        # 型別檢查 + 正式建置到 dist/（含 Pages base path）
+npm run build:pages  # build + 同步 dist → 根目錄（供 GitHub Pages）
+npm run preview      # 預覽 dist/
 ```
 
 ## 核心迴圈（UI）
@@ -73,9 +79,8 @@ Stub 入口：
 
 ## CI／Deploy
 
-- **GitHub Pages：** `.github/workflows/pages.yml` — push `main`（或手動 `workflow_dispatch`）建置並部署。  
-- **AWS ECS：** `.github/workflows/aws.yml` 仍為 **僅 `workflow_dispatch`**；MVP 不需要，也不會在 push／PR 自動跑。勿把 `MY_*` 佔位值加回 push 觸發。  
-- 日後若要 ECS：先備妥 Dockerfile、task definition，再於 repo Variables／Secrets 填入設定（見該 workflow 註解）。
+- **GitHub Pages：** `.github/workflows/pages.yml` — push `main` 建置 `dist/`、驗證、同步根目錄 publish 檔；並嘗試 `actions/deploy-pages`（需 Source = GitHub Actions）。  
+- **AWS ECS：** `.github/workflows/aws.yml` 仍為 **僅 `workflow_dispatch`**；勿把 `MY_*` 佔位值加回 push 觸發。  
 
 ## 授權注意
 
