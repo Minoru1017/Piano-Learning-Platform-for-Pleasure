@@ -139,7 +139,9 @@ export function RecordScreen({ onRecorded, onLoadDemo }: RecordScreenProps) {
           <p className="brand">跟彈</p>
           <h1 className="headline">坐在白鋼琴旁，環境隨情緒呼吸</h1>
           <p className="lede">
-            錄下整首歌（或你要的長度）；開頭靜音與底噪會自動裁切，小節 1 對齊音樂起點。可用麥克風，或用螢幕／分頁音訊在耳機聽歌時擷取。
+            錄下整首歌（或你要的長度）；開頭靜音與底噪會自動裁切，小節 1 對齊音樂起點。目前采音為
+            <strong>簡易（Easy）</strong>
+            ：右手嚴格單音、左手根音。可用麥克風，或用螢幕／分頁音訊在耳機聽歌時擷取。
           </p>
         </div>
 

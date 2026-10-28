@@ -39,6 +39,19 @@ export interface StemCharacterization {
 
 export type BpmSource = 'audio-autocorr' | 'onset-median' | 'demo'
 
+/**
+ * Extraction / arrangement difficulty.
+ * Easy = today’s playable rules (strict monophonic RH, LH roots, ornaments off by default).
+ * Medium / Hard reserved for later — not implemented yet.
+ */
+export type ExtractMode = 'easy' | 'medium' | 'hard'
+
+export const EXTRACT_MODE_LABEL_ZH: Record<ExtractMode, string> = {
+  easy: '簡易',
+  medium: '中等',
+  hard: '進階',
+}
+
 export interface Arrangement {
   title: string
   bpm: number
@@ -57,6 +70,11 @@ export interface Arrangement {
   musicStartOffsetSec?: number
   /** Best-effort stem characterization metadata (v1.5). */
   stems?: StemCharacterization
+  /**
+   * 采音模式. Current pipeline is always Easy.
+   * (Named extractMode — not mic/display CaptureMode.)
+   */
+  extractMode: ExtractMode
 }
 
 export interface LoopRange {

@@ -30,7 +30,8 @@ export async function analyzeRecording(
     return {
       ...demo,
       musicStartOffsetSec,
-      analyzerNote: `Basic Pitch 無法使用（${reason}）。目前為示範分析器：不會忠實跟錄音音高，請當跟彈流程測試。`,
+      extractMode: 'easy',
+      analyzerNote: `Basic Pitch 無法使用（${reason}）。目前為示範分析器（簡易 Easy）：不會忠實跟錄音音高，請當跟彈流程測試。`,
     }
   }
 }

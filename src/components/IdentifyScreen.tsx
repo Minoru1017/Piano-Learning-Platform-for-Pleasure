@@ -85,10 +85,11 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
         <p className="brand">跟彈</p>
         <h1 className="headline">這是哪一首？</h1>
         <p className="lede">
-          可用 AudD 自動填入歌名，<strong>一律可手動修改</strong>。確認後會用
-          <strong>同一段錄音</strong>抽出可彈素材：
-          <strong>有人聲 → 右手只采人聲；無人聲 → 采器樂主旋律</strong>
-          ；左手仍為強拍根音（Basic Pitch；失敗則降級示範分析器並標示）。
+          可用 AudD 自動填入歌名，<strong>一律可手動修改</strong>。確認後以
+          <strong>簡易（Easy）</strong>
+          采音：同一段錄音抽出可彈素材——
+          <strong>有人聲 → 右手只采人聲單音；無人聲 → 主旋律單音（不重疊）</strong>
+          ；左手強拍根音（Basic Pitch；失敗則降級示範分析器並標示）。
         </p>
       </div>
 

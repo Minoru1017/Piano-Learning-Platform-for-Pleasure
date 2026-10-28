@@ -58,7 +58,8 @@ export function createDemoArrangement(): Arrangement {
     measureCount: 8,
     notes,
     analyzer: 'demo',
-    analyzerNote: '內建示範編曲（非從錄音抽出）。',
+    analyzerNote: '內建示範編曲（非從錄音抽出）。采音模式：簡易（Easy）— 右手嚴格單音。',
     sourceDurationSec: 0,
+    extractMode: 'easy',
   }
 }
