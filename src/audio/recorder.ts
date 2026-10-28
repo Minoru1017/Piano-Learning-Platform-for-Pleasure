@@ -1,5 +1,13 @@
 import { cleanCaptureBlob } from './cleanCapture'
+import {
+  DisplayCaptureError,
+  failReasonForNoAudio,
+  requestDisplayStream,
+} from './displayCapture'
 import { peakNormalizeBlob } from './normalize'
+
+export { DisplayCaptureError, DISPLAY_AUDIO_CHECKLIST_ZH } from './displayCapture'
+export type { DisplayAudioFailReason, DisplaySurfaceKind } from './displayCapture'
 
 /** Soft safety cap — full songs OK; UI documents this. */
 export const MAX_RECORDING_SEC = 12 * 60 // 12 minutes
@@ -59,6 +67,8 @@ export function displayAudioSupported(): boolean {
 
 export class AudioCapture {
   private stream: MediaStream | null = null
+  /** Display-capture video tracks held disabled so Chromium keeps the share alive. */
+  private heldVideoTracks: MediaStreamTrack[] = []
   private mediaRecorder: MediaRecorder | null = null
   private chunks: Blob[] = []
   private startedAt = 0
@@ -79,39 +89,38 @@ export class AudioCapture {
 
   /**
    * Tab / system audio via getDisplayMedia.
-   * Chrome: choose a tab and enable「分享分頁音訊」.
-   * Safari / some browsers: often no audio track — we surface a clear error.
+   * Chromium: request audio + systemAudio; diagnose surface if tracks empty.
+   * Does not preferCurrentTab (music is usually in another tab).
    */
   async startDisplay(): Promise<void> {
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      throw new Error('此瀏覽器不支援螢幕／分頁音訊擷取（getDisplayMedia）')
-    }
     this.mode = 'display'
-    let raw: MediaStream
-    try {
-      raw = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      })
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : '使用者取消或拒絕分享'
-      throw new Error(`無法開始螢幕／分頁音訊：${msg}`)
-    }
+    const { stream: raw, displaySurface } = await requestDisplayStream()
 
-    const audioTracks = raw.getAudioTracks()
-    // Drop video ASAP — we only need audio for the song.
-    raw.getVideoTracks().forEach((t) => t.stop())
+    const audioTracks = raw.getAudioTracks().filter((t) => t.readyState !== 'ended')
 
     if (!audioTracks.length) {
+      // Read surface from video first, then tear down — never leave a ghost share.
       raw.getTracks().forEach((t) => t.stop())
-      throw new Error(
-        '沒有收到音軌。請改用 Chrome／Edge，分享「分頁」並勾選「分享分頁音訊」；Safari 通常無法擷取分頁聲音，請改用麥克風或換瀏覽器。',
-      )
+      throw new DisplayCaptureError(failReasonForNoAudio(displaySurface), displaySurface)
+    }
+
+    // Hold video disabled (do not stop): some Chromium builds end the whole
+    // capture session — including audio — when the video track is stopped early.
+    this.heldVideoTracks = raw.getVideoTracks()
+    for (const vt of this.heldVideoTracks) {
+      try {
+        vt.enabled = false
+      } catch {
+        /* ignore */
+      }
+    }
+
+    for (const at of audioTracks) {
+      at.enabled = true
     }
 
     this.stream = new MediaStream(audioTracks)
     audioTracks[0]!.addEventListener('ended', () => {
-      // User stopped sharing from browser chrome
       this.onMaxReached?.()
     })
     this.beginRecorder()
@@ -213,6 +222,14 @@ export class AudioCapture {
   private teardownStream(): void {
     this.stream?.getTracks().forEach((t) => t.stop())
     this.stream = null
+    for (const vt of this.heldVideoTracks) {
+      try {
+        vt.stop()
+      } catch {
+        /* ignore */
+      }
+    }
+    this.heldVideoTracks = []
     this.mediaRecorder = null
   }
 }

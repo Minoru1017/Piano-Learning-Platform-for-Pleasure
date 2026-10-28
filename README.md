@@ -90,7 +90,7 @@ VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pag
 
 | 能力 | 狀態 |
 | --- | --- |
-| 麥克風／螢幕分頁音訊 | **真實**（關通話 DSP；清潔 onset＋閘；峰值正規化；上限 12 分） |
+| 麥克風／螢幕分頁音訊 | **真實**（關通話 DSP；清潔 onset＋閘；峰值正規化；上限 12 分）。Chrome／Edge：選**播歌分頁**並勾選「分享分頁音訊」；無音軌時有檢查清單＋重試 |
 | 歌曲指紋／辨歌 | **AudD 經 Worker**（需你部署＋設 `VITE_AUDD_PROXY_URL`）；否則 **stub**；**歌名永遠可手動改** |
 | 音高 → 分層鋼琴 | **BPM**（自相關）＋ **Basic Pitch**；分層特徵 BASS／人聲／主旋律／和聲／點綴（非 Demucs）；預設 RH＝人聲或主旋律、LH＝BASS；點綴預設關；失敗 → **示範分析器** |
 | 虛擬鍵盤跟彈、循環、放慢、RH/LH、層開關、習慣勾選 | **真實 UI／邏輯** |
