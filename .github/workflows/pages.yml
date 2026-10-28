@@ -1,5 +1,6 @@
 # Deploy the Vite MVP web prototype to GitHub Pages.
-# Does not touch the optional AWS ECS workflow (workflow_dispatch only).
+# Publishes `dist/` (production build), never the Vite source tree.
+# AWS ECS workflow stays workflow_dispatch-only.
 
 name: Deploy GitHub Pages
 
@@ -9,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -36,6 +37,36 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify production HTML (not Vite source)
+        run: |
+          set -euo pipefail
+          html=dist/index.html
+          test -f "$html"
+          if grep -E 'src="/src/main\.tsx"|src="/main\.tsx"' "$html"; then
+            echo "::error::dist/index.html still references Vite source entry"
+            cat "$html"
+            exit 1
+          fi
+          grep -q '/Piano-Learning-Platform-for-Pleasure/assets/' "$html"
+          echo "OK production asset paths:"
+          grep -E 'src=|href=' "$html"
+
+      - name: Sync production build to repo root (legacy Pages: main /)
+        run: npm run sync:pages
+
+      - name: Commit root publish files if changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html assets .nojekyll favicon.svg || true
+          if git diff --staged --quiet; then
+            echo "No publish-file changes"
+          else
+            git commit -m "chore: sync GitHub Pages root from vite dist [skip ci]"
+            git push
+          fi
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -47,6 +78,9 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    # Succeeds only when Settings → Pages → Source = GitHub Actions.
+    # Legacy branch publishing is covered by the root sync job above.
+    continue-on-error: true
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
