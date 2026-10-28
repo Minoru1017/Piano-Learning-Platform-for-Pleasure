@@ -92,8 +92,8 @@ VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pag
 | --- | --- |
 | 麥克風錄音（MediaRecorder） | **真實**（音樂取向：關通話 DSP；錄音後峰值正規化） |
 | 歌曲指紋／辨歌 | **AudD 經 Worker**（需你部署＋設 `VITE_AUDD_PROXY_URL`）；否則 **stub**；**歌名永遠可手動改** |
-| 音高 → RH/LH 編曲 | **Basic Pitch（瀏覽器 TFJS WASM）**；RH **優先人聲否則主旋律**；LH 強拍根音；失敗則 **示範分析器**並標示 |
-| 虛擬鍵盤跟彈、循環、放慢、RH/LH、習慣勾選 | **真實 UI／邏輯** |
+| 音高 → 分層鋼琴 | **BPM**（自相關）＋ **Basic Pitch**；分層特徵 BASS／人聲／主旋律／和聲／點綴（非 Demucs）；預設 RH＝人聲或主旋律、LH＝BASS；點綴預設關；失敗 → **示範分析器** |
+| 虛擬鍵盤跟彈、循環、放慢、RH/LH、層開關、習慣勾選 | **真實 UI／邏輯** |
 | 預覽音色 | 簡易 Web Audio 合成（非真實鋼琴採樣） |
 | 對錯偵測 | **不做（v1）** |
 | 串流抓完整曲／PDF | **不做（v1）** |
@@ -103,10 +103,11 @@ VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pag
 - `workers/audd-proxy/` — Cloudflare Worker  
 - `src/audio/songIdentify.ts` — 前端辨識（AudD → stub 降級）  
 - `src/audio/analyzeRecording.ts` / `basicPitchAnalyzer.ts` / `arrangeFromPitch.ts` — 轉譜  
+- `src/audio/bpm.ts` / `stemCharacterize.ts` / `vocalPrefer.ts` — BPM＋分層特徵  
 - `src/audio/demoAnalyzer.ts` — 降級示範分析器  
 - `public/basic-pitch/` · `public/tfjs-wasm/` — 模型與 WASM  
 
-**準度提醒：** 密集混音、遠距喇叭錄音仍容易跟原曲有出入；MVP 優先「能跟彈的極簡雙手」，不是出版級轉譜。
+**準度提醒：** 分層是瀏覽器內 best-effort（頻段／中置／暫態），不是專業分軌；密集混音、遠距喇叭仍容易跟原曲有出入。MVP 優先「能跟彈的極簡雙手」，不是出版級轉譜。
 
 ## 技術
 

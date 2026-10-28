@@ -427,9 +427,59 @@ input {
   margin: 0 0.35rem;
 }
 
+.bpm-badge {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--walnut-900);
+  letter-spacing: 0.02em;
+}
+
 .practice-analyzer-note {
   margin-top: 0.65rem;
   max-width: 40rem;
+}
+
+.stem-copy {
+  margin: 0.55rem 0 0;
+  max-width: 40rem;
+  color: var(--ink-faint);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.layer-controls {
+  margin: 0 0 1.15rem;
+  padding: 0.85rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.layer-controls__label {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.layer-controls__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip--layer {
+  font-variant-numeric: tabular-nums;
+}
+
+.role-tag {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
 }
 
 .practice-hero {

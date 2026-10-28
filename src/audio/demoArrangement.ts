@@ -23,17 +23,22 @@ export function createDemoArrangement(): Arrangement {
   ] as const
 
   for (const [beat, midi] of melody) {
-    notes.push({ midi, startBeat: beat, durationBeats: 0.9, hand: 'rh' })
+    notes.push({ midi, startBeat: beat, durationBeats: 0.9, hand: 'rh', role: 'melody' })
   }
 
   for (let m = 0; m < 8; m++) {
     const roots = [48, 43, 45, 41]
     const root = roots[m % 4]!
-    notes.push({ midi: root, startBeat: m * 4, durationBeats: 1.5, hand: 'lh' })
-    notes.push({ midi: root, startBeat: m * 4 + 2, durationBeats: 1.5, hand: 'lh' })
+    notes.push({ midi: root, startBeat: m * 4, durationBeats: 1.5, hand: 'lh', role: 'bass' })
+    notes.push({
+      midi: root,
+      startBeat: m * 4 + 2,
+      durationBeats: 1.5,
+      hand: 'lh',
+      role: 'bass',
+    })
   }
 
-  // Fill measures 4–7 with a second phrase
   const phrase2 = [67, 69, 71, 72, 71, 69, 67, 65, 64, 62, 60, 62, 64, 65, 67, 60] as const
   for (let i = 0; i < phrase2.length; i++) {
     notes.push({
@@ -41,12 +46,14 @@ export function createDemoArrangement(): Arrangement {
       startBeat: 16 + i,
       durationBeats: 0.9,
       hand: 'rh',
+      role: 'melody',
     })
   }
 
   return {
     title: '示範・副歌四小節',
     bpm: 88,
+    bpmSource: 'demo',
     beatsPerMeasure: 4,
     measureCount: 8,
     notes,

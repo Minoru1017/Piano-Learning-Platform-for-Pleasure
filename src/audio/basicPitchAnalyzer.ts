@@ -1,7 +1,8 @@
 /**
- * Spotify Basic Pitch (TFJS + WASM) → Direction B arrangement.
- * RH: prefer vocals when detected, else instrumental/predominant melody.
- * LH: roots from the full mix. Model weights in `public/basic-pitch/`.
+ * Spotify Basic Pitch (TFJS + WASM) → Direction B layered arrangement.
+ * BPM from audio autocorrelation; stems via band/stereo/transient heuristics;
+ * RH: vocals first else instrumental melody; LH: bass roots; optional harmony/ornament.
+ * Model weights in `public/basic-pitch/`.
  */
 import {
   BasicPitch,
@@ -13,7 +14,9 @@ import * as tf from '@tensorflow/tfjs'
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm'
 import type { Arrangement } from '../types/music'
 import { arrangeDirectionBParts, type RawPitchNote } from './arrangeFromPitch'
+import { detectBpm } from './bpm'
 import { toBasicPitchAudioBuffer } from './resample'
+import { characterizeStems } from './stemCharacterize'
 import { buildRhSourceBuffer } from './vocalPrefer'
 
 let backendReady: Promise<void> | null = null
@@ -64,7 +67,6 @@ async function runBasicPitch(
   buffer: AudioBuffer,
   onPct: (p: number) => void,
 ): Promise<RawPitchNote[]> {
-  // Mic capture is often 44100/48000; evaluateModel requires mono @ 22050.
   const bpInput = toBasicPitchAudioBuffer(buffer)
   const frames: number[][] = []
   const onsets: number[][] = []
@@ -97,55 +99,71 @@ export async function analyzeRecordingBasicPitch(
   durationSecFallback: number,
   onProgress?: ProgressCb,
 ): Promise<Arrangement> {
-  onProgress?.(0.05, '載入 Basic Pitch 模型…')
+  onProgress?.(0.04, '載入 Basic Pitch 模型…')
   const model = await getModel()
-  onProgress?.(0.12, '解碼錄音…')
+  onProgress?.(0.1, '解碼錄音…')
   const audio = await decodeBlob(blob)
   const durationSec = audio.duration || durationSecFallback
 
-  onProgress?.(0.16, '判斷是否有人聲（優先采人聲）…')
+  onProgress?.(0.14, '偵測 BPM…')
+  const bpmResult = detectBpm(audio)
+
+  onProgress?.(0.18, '分層特徵化（BASS／人聲／主旋律／和聲／點綴）…')
+  const { stems, vocalDetect } = characterizeStems(audio)
   const rhPlan = buildRhSourceBuffer(audio)
 
   onProgress?.(
-    0.2,
+    0.22,
     rhPlan.source === 'vocal'
       ? 'Basic Pitch：人聲取向音軌（RH）…'
       : 'Basic Pitch：器樂／主旋律（RH）…',
   )
   const rhNotes = await runBasicPitch(model, rhPlan.buffer, (p) => {
-    onProgress?.(0.2 + p * 0.45, 'Basic Pitch 推論 RH…')
+    onProgress?.(0.22 + p * 0.42, 'Basic Pitch 推論 RH…')
   })
 
-  // LH roots from the full mix (accompaniment / bass), not the vocal stem.
-  onProgress?.(0.68, 'Basic Pitch：全混音估計左手根音…')
-  let lhNotes: RawPitchNote[]
+  onProgress?.(0.66, 'Basic Pitch：全混音（BASS／和聲／點綴）…')
+  let mixNotes: RawPitchNote[]
   if (rhPlan.source === 'vocal') {
-    lhNotes = await runBasicPitch(model, audio, (p) => {
-      onProgress?.(0.68 + p * 0.22, 'Basic Pitch 推論 LH…')
+    mixNotes = await runBasicPitch(model, audio, (p) => {
+      onProgress?.(0.66 + p * 0.22, 'Basic Pitch 推論混音…')
     })
   } else {
-    // Same pass already tracked the mix — reuse RH notes for LH lows.
-    lhNotes = rhNotes
+    mixNotes = rhNotes
   }
 
-  onProgress?.(0.92, '整理成右手單音＋左手強拍根音…')
-  const primary = rhNotes.length >= 2 ? rhNotes : lhNotes
+  onProgress?.(0.9, '映射為可跟彈鋼琴層…')
+  const primary = rhNotes.length >= 2 ? rhNotes : mixNotes
   if (primary.length < 2) {
     throw new Error('Basic Pitch 幾乎沒偵測到音符（錄音可能太短或太安靜）')
   }
 
+  const rhRole = rhPlan.source === 'vocal' ? 'vocal' : 'melody'
   const srcLabel =
     rhPlan.source === 'vocal'
-      ? `偵測到偏人聲（信心 ${rhPlan.detect.confidence.toFixed(2)}）→ RH 只采人聲取向音軌`
-      : `未明顯偵測人聲（信心 ${rhPlan.detect.confidence.toFixed(2)}）→ RH 采器樂／主旋律`
+      ? `偵測到偏人聲（信心 ${vocalDetect.confidence.toFixed(2)}）→ RH＝人聲`
+      : `未明顯偵測人聲（信心 ${vocalDetect.confidence.toFixed(2)}）→ RH＝主旋律`
+
+  const stemBrief = [
+    `BASS ${stems.bass.presence.toFixed(2)}`,
+    `人聲 ${stems.vocal.presence.toFixed(2)}`,
+    `主旋律 ${stems.melody.presence.toFixed(2)}`,
+    `和聲 ${stems.harmony.presence.toFixed(2)}`,
+    `點綴 ${stems.ornament.presence.toFixed(2)}`,
+  ].join(' · ')
 
   return arrangeDirectionBParts({
-    rhNotes: rhNotes.length >= 2 ? rhNotes : lhNotes,
-    lhNotes,
+    rhNotes: rhNotes.length >= 2 ? rhNotes : mixNotes,
+    lhNotes: mixNotes,
+    mixNotes,
     title,
     sourceDurationSec: durationSec,
     analyzer: 'basic-pitch',
     preferVocalRange: rhPlan.source === 'vocal',
-    analyzerNote: `${srcLabel}；LH 根音仍來自全混音。中置分離為啟發式（非 Demucs），混音／單聲道喇叭錄音仍可能有出入。`,
+    rhRole,
+    bpm: bpmResult.bpm,
+    bpmSource: bpmResult.source,
+    stems,
+    analyzerNote: `${srcLabel}；BPM ${bpmResult.bpm}（信心 ${bpmResult.confidence.toFixed(2)}）。分層為頻段／中置／暫態啟發式（非 Demucs）：${stemBrief}。混音特徵僅作進譜閘，非專業分軌；點綴預設關閉。`,
   })
 }
