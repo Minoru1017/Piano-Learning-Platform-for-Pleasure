@@ -51,6 +51,7 @@ export function createDemoArrangement(): Arrangement {
     measureCount: 8,
     notes,
     analyzer: 'demo',
+    analyzerNote: '內建示範編曲（非從錄音抽出）。',
     sourceDurationSec: 0,
   }
 }

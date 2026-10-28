@@ -11,6 +11,7 @@ const rootIndex = join(root, 'index.html')
 const rootAssets = join(root, 'assets')
 const rootFavicon = join(root, 'favicon.svg')
 const rootNojekyll = join(root, '.nojekyll')
+const extraDirs = ['basic-pitch', 'tfjs-wasm']
 
 if (!existsSync(dist)) {
   console.error('dist/ missing — run npm run build first')
@@ -40,4 +41,14 @@ if (existsSync(join(dist, '.nojekyll'))) {
   writeFileSync(rootNojekyll, '')
 }
 
-console.log('Synced dist/ → repo root (index.html, assets/, favicon.svg, .nojekyll)')
+for (const dir of extraDirs) {
+  const from = join(dist, dir)
+  const to = join(root, dir)
+  if (!existsSync(from)) continue
+  rmSync(to, { recursive: true, force: true })
+  cpSync(from, to, { recursive: true })
+}
+
+console.log(
+  'Synced dist/ → repo root (index.html, assets/, favicon.svg, .nojekyll, basic-pitch/, tfjs-wasm/)',
+)

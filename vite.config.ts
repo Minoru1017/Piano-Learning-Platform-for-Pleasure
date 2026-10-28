@@ -22,6 +22,10 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, 'dist'),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 2500,
+  },
+  optimizeDeps: {
+    include: ['@tensorflow/tfjs', '@tensorflow/tfjs-backend-wasm', '@spotify/basic-pitch'],
   },
   server: {
     fs: {

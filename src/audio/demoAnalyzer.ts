@@ -179,6 +179,8 @@ export async function analyzeRecordingDemo(
     measureCount,
     notes,
     analyzer: 'demo',
+    analyzerNote:
+      '示範分析器：依節奏／種子產生可練的 RH＋LH，不會忠實對上錄音音高。請勿當成正式轉譜。',
     sourceDurationSec: durationSec,
   }
 }

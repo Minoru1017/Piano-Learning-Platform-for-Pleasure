@@ -1,24 +1,19 @@
-# Swapping in Basic Pitch
+# Basic Pitch（已接入瀏覽器）
 
-`demoAnalyzer.ts` is a labeled demo path so the UX loop works offline without model weights.
+`@spotify/basic-pitch` + TFJS WASM 在前端跑推論。權重在 `public/basic-pitch/`，WASM 在 `public/tfjs-wasm/`。
 
-## Target interface
+## 流程
 
-Return `Arrangement` from `src/types/music.ts`:
+1. `analyzeRecording()` 優先呼叫 `basicPitchAnalyzer.ts`
+2. 模型輸出 → `arrangeFromPitch.ts` 收成 Direction B：RH 單音量化、LH 僅強拍根音
+3. 失敗則降級 `demoAnalyzer.ts`，並在 UI 標示「示範分析器」
 
-- `notes[]` with `hand: 'rh' | 'lh'`
-- RH: at most one pitch at any time; roughly C3–C6; quantized
-- LH: **roots only** on strong beats (1–2 hits per measure); no root+fifth in v1
-- `beatsPerMeasure: 4`, sensible `bpm`, `measureCount`
+## 準度限制（請對使用者誠實）
 
-## Suggested steps
+- 適合較乾淨、偏單一旋律的錄音；**密集混音／多樂器**仍會錯音、漏音、把伴奏當旋律
+- LH 根音是從低音／小節內音高估計，不是商業級和弦辨識
+- 節奏量化到 16 分音；原曲自由拍會對不齊
 
-1. Decode the same `Blob` from the mic recording (`AudioBuffer`).
-2. Run Basic Pitch (WASM/ONNX in-browser, or a small local/server inference).
-3. Post-process:
-   - Melody line → RH monophonic
-   - Chord / bass estimate → keep only downbeat (and optional beat 3) root
-4. Map into measure grid; expose loop selection in the practice UI (already built).
-5. Set `analyzer: 'basic-pitch'`.
+## 本機開發
 
-Keep `analyzeRecordingDemo` as fallback when the model fails to load.
+模型已跟 repo 的 `public/` 一起走；`npm run build` 會複製進 `dist/`。首次推論需下載／載入約 1MB 權重＋WASM。

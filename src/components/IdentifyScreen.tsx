@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { RecordingResult } from '../audio/recorder'
-import { analyzeRecordingDemo } from '../audio/demoAnalyzer'
+import { analyzeRecording } from '../audio/analyzeRecording'
 import { identifySong, isAuddConfigured, type SongIdConfidence } from '../audio/songIdentify'
 import type { Arrangement } from '../types/music'
 
@@ -18,6 +18,8 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
   const [confidence, setConfidence] = useState<SongIdConfidence | null>(null)
   const [identifying, setIdentifying] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeLabel, setAnalyzeLabel] = useState('')
+  const [analyzePct, setAnalyzePct] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -49,11 +51,17 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
     const trimmed = title.trim() || '未命名練習'
     setAnalyzing(true)
     setError(null)
+    setAnalyzePct(0)
+    setAnalyzeLabel('準備抽出旋律…')
     try {
-      const arrangement = await analyzeRecordingDemo(
+      const arrangement = await analyzeRecording(
         recording.blob,
         trimmed,
         recording.durationSec,
+        (pct, label) => {
+          setAnalyzePct(pct)
+          setAnalyzeLabel(label)
+        },
       )
       onReady(arrangement)
     } catch (e) {
@@ -76,7 +84,7 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
         <h1 className="headline">這是哪一首？</h1>
         <p className="lede">
           可用 AudD 自動填入歌名，<strong>一律可手動修改</strong>。確認後會用
-          <strong>同一段錄音</strong>抽出 RH 旋律＋LH 根音（demo 分析器）。
+          <strong>同一段錄音</strong>跑 Basic Pitch，收成 RH 單音旋律＋LH 強拍根音（失敗則降級示範分析器並標示）。
         </p>
       </div>
 
@@ -86,7 +94,6 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
           src={recording.objectUrl}
           controls
           preload="auto"
-          // Explicit full volume — quietness was from the mic signal, not the element.
           ref={(el) => {
             if (el) el.volume = 1
           }}
@@ -110,6 +117,11 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
         <p className={bannerClass} role="status">
           {statusNote}
         </p>
+        {analyzing && (
+          <p className="stub-banner stub-banner--ok" role="status">
+            {analyzeLabel}（{Math.round(analyzePct * 100)}%）
+          </p>
+        )}
         {error && <p className="error">{error}</p>}
 
         <div className="actions">

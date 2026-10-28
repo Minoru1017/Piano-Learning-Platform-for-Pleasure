@@ -185,10 +185,22 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
           <h1 className="practice-title">{arrangement.title}</h1>
           <p className="practice-sub">
             {arrangement.bpm} BPM · {arrangement.measureCount} 小節 ·{' '}
-            {arrangement.analyzer === 'demo' ? 'Demo 分析器' : 'Basic Pitch'}
+            {arrangement.analyzer === 'demo' ? '示範分析器（非忠實轉譜）' : 'Basic Pitch'}
             <span className="dot">·</span>
             來源 {arrangement.sourceDurationSec.toFixed(1)}s 錄音
           </p>
+          {arrangement.analyzerNote && (
+            <p
+              className={
+                arrangement.analyzer === 'demo'
+                  ? 'stub-banner stub-banner--warn practice-analyzer-note'
+                  : 'stub-banner stub-banner--ok practice-analyzer-note'
+              }
+              role="status"
+            >
+              {arrangement.analyzerNote}
+            </p>
+          )}
         </div>
         <button type="button" className="btn btn--ghost btn--small" onClick={onRestart}>
           新錄音
