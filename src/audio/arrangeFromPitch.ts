@@ -121,6 +121,49 @@ function lhRootsFromNotes(
   return events
 }
 
+export interface ArrangeOptions {
+  /** Notes used for RH monophonic line (vocal stem or instrumental mix). */
+  rhNotes: RawPitchNote[]
+  /** Notes used for LH roots (usually full-mix pitch track). Defaults to rhNotes. */
+  lhNotes?: RawPitchNote[]
+  title: string
+  sourceDurationSec: number
+  analyzer: Arrangement['analyzer']
+  analyzerNote?: string
+  /** Prefer singing range when RH came from a vocal stem. */
+  preferVocalRange?: boolean
+}
+
+function monophonicMelodyPreferVocal(notes: RawPitchNote[]): RawPitchNote[] {
+  // Lead vocal often sits ~G3–E5; lightly boost that band when choosing conflicts.
+  const VOCAL_LO = 55
+  const VOCAL_HI = 76
+  const melodic = notes
+    .filter((n) => n.pitchMidi >= RH_LO && n.pitchMidi <= RH_HI && n.durationSeconds >= 0.05)
+    .sort((a, b) => a.startTimeSeconds - b.startTimeSeconds || b.amplitude - a.amplitude)
+
+  const kept: RawPitchNote[] = []
+  const score = (x: RawPitchNote) => {
+    const inVocal = x.pitchMidi >= VOCAL_LO && x.pitchMidi <= VOCAL_HI ? 1.35 : 1
+    return x.amplitude * 2 * inVocal + (x.pitchMidi - RH_LO) * 0.005
+  }
+  for (const n of melodic) {
+    const end = n.startTimeSeconds + n.durationSeconds
+    const conflict = kept.find((k) => {
+      const kEnd = k.startTimeSeconds + k.durationSeconds
+      return n.startTimeSeconds < kEnd - 0.02 && end > k.startTimeSeconds + 0.02
+    })
+    if (!conflict) {
+      kept.push(n)
+      continue
+    }
+    if (score(n) > score(conflict)) {
+      kept.splice(kept.indexOf(conflict), 1, n)
+    }
+  }
+  return kept
+}
+
 /**
  * Turn Basic Pitch (or similar) raw notes into Direction-B arrangement:
  * RH monophonic quantized melody + LH strong-beat roots only.
@@ -132,8 +175,26 @@ export function arrangeDirectionB(
   analyzer: Arrangement['analyzer'],
   analyzerNote?: string,
 ): Arrangement {
-  const bpm = estimateBpmFromOnsets(rawNotes, sourceDurationSec)
-  const melody = monophonicMelody(rawNotes)
+  return arrangeDirectionBParts({
+    rhNotes: rawNotes,
+    lhNotes: rawNotes,
+    title,
+    sourceDurationSec,
+    analyzer,
+    analyzerNote,
+  })
+}
+
+export function arrangeDirectionBParts(opts: ArrangeOptions): Arrangement {
+  const rhSource = opts.rhNotes
+  const lhSource = opts.lhNotes ?? opts.rhNotes
+  const bpm = estimateBpmFromOnsets(
+    rhSource.length >= 2 ? rhSource : lhSource,
+    opts.sourceDurationSec,
+  )
+  const melody = opts.preferVocalRange
+    ? monophonicMelodyPreferVocal(rhSource)
+    : monophonicMelody(rhSource)
   const secondsPerBeat = 60 / bpm
 
   const rh: NoteEvent[] = melody.map((n) => {
@@ -150,19 +211,19 @@ export function arrangeDirectionB(
   const lastBeat = Math.max(
     4,
     ...rh.map((n) => n.startBeat + n.durationBeats),
-    (sourceDurationSec / secondsPerBeat) || 4,
+    opts.sourceDurationSec / secondsPerBeat || 4,
   )
   const measureCount = Math.min(16, Math.max(4, Math.ceil(lastBeat / 4)))
-  const lh = lhRootsFromNotes(rawNotes, bpm, measureCount)
+  const lh = lhRootsFromNotes(lhSource, bpm, measureCount)
 
   return {
-    title,
+    title: opts.title,
     bpm,
     beatsPerMeasure: 4,
     measureCount,
     notes: [...lh, ...rh],
-    analyzer,
-    sourceDurationSec,
-    analyzerNote,
+    analyzer: opts.analyzer,
+    sourceDurationSec: opts.sourceDurationSec,
+    analyzerNote: opts.analyzerNote,
   }
 }

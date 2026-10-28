@@ -1,6 +1,7 @@
 /**
  * Spotify Basic Pitch (TFJS + WASM) → Direction B arrangement.
- * Model weights live in `public/basic-pitch/` (copied from @spotify/basic-pitch).
+ * RH: prefer vocals when detected, else instrumental/predominant melody.
+ * LH: roots from the full mix. Model weights in `public/basic-pitch/`.
  */
 import {
   BasicPitch,
@@ -11,8 +12,9 @@ import {
 import * as tf from '@tensorflow/tfjs'
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm'
 import type { Arrangement } from '../types/music'
-import { arrangeDirectionB, type RawPitchNote } from './arrangeFromPitch'
+import { arrangeDirectionBParts, type RawPitchNote } from './arrangeFromPitch'
 import { toBasicPitchAudioBuffer } from './resample'
+import { buildRhSourceBuffer } from './vocalPrefer'
 
 let backendReady: Promise<void> | null = null
 let modelPromise: Promise<BasicPitch> | null = null
@@ -25,7 +27,6 @@ function assetUrl(path: string): string {
 async function ensureTfBackend(): Promise<void> {
   if (!backendReady) {
     backendReady = (async () => {
-      // Prefer WASM for consistent results across GPUs (see basic-pitch issue #143).
       setWasmPaths(assetUrl('tfjs-wasm/'))
       try {
         await tf.setBackend('wasm')
@@ -58,6 +59,36 @@ async function decodeBlob(blob: Blob): Promise<AudioBuffer> {
   }
 }
 
+async function runBasicPitch(
+  model: BasicPitch,
+  buffer: AudioBuffer,
+  onPct: (p: number) => void,
+): Promise<RawPitchNote[]> {
+  // Mic capture is often 44100/48000; evaluateModel requires mono @ 22050.
+  const bpInput = toBasicPitchAudioBuffer(buffer)
+  const frames: number[][] = []
+  const onsets: number[][] = []
+  const contours: number[][] = []
+  await model.evaluateModel(
+    bpInput,
+    (f, o, c) => {
+      frames.push(...f)
+      onsets.push(...o)
+      contours.push(...c)
+    },
+    onPct,
+  )
+  const poly = outputToNotesPoly(frames, onsets, 0.5, 0.3, 5)
+  const withBends = addPitchBendsToNoteEvents(contours, poly)
+  const timed = noteFramesToTime(withBends)
+  return timed.map((n) => ({
+    startTimeSeconds: n.startTimeSeconds,
+    durationSeconds: Math.max(0.05, n.durationSeconds),
+    pitchMidi: Math.round(n.pitchMidi),
+    amplitude: n.amplitude,
+  }))
+}
+
 export type ProgressCb = (percent: number, label: string) => void
 
 export async function analyzeRecordingBasicPitch(
@@ -68,52 +99,53 @@ export async function analyzeRecordingBasicPitch(
 ): Promise<Arrangement> {
   onProgress?.(0.05, '載入 Basic Pitch 模型…')
   const model = await getModel()
-  onProgress?.(0.15, '解碼錄音…')
+  onProgress?.(0.12, '解碼錄音…')
   const audio = await decodeBlob(blob)
   const durationSec = audio.duration || durationSecFallback
 
-  // Mic capture is often 44100/48000; BasicPitch.evaluateModel requires mono @ 22050.
-  onProgress?.(0.18, '重採樣至 22050 Hz（單聲道）…')
-  const bpInput = toBasicPitchAudioBuffer(audio)
+  onProgress?.(0.16, '判斷是否有人聲（優先采人聲）…')
+  const rhPlan = buildRhSourceBuffer(audio)
 
-  const frames: number[][] = []
-  const onsets: number[][] = []
-  const contours: number[][] = []
-
-  onProgress?.(0.2, 'Basic Pitch 推論中…')
-  await model.evaluateModel(
-    bpInput,
-    (f, o, c) => {
-      frames.push(...f)
-      onsets.push(...o)
-      contours.push(...c)
-    },
-    (p) => {
-      onProgress?.(0.2 + p * 0.7, 'Basic Pitch 推論中…')
-    },
+  onProgress?.(
+    0.2,
+    rhPlan.source === 'vocal'
+      ? 'Basic Pitch：人聲取向音軌（RH）…'
+      : 'Basic Pitch：器樂／主旋律（RH）…',
   )
+  const rhNotes = await runBasicPitch(model, rhPlan.buffer, (p) => {
+    onProgress?.(0.2 + p * 0.45, 'Basic Pitch 推論 RH…')
+  })
 
-  onProgress?.(0.92, '整理成右手旋律＋左手根音…')
-  const poly = outputToNotesPoly(frames, onsets, 0.5, 0.3, 5)
-  const withBends = addPitchBendsToNoteEvents(contours, poly)
-  const timed = noteFramesToTime(withBends)
+  // LH roots from the full mix (accompaniment / bass), not the vocal stem.
+  onProgress?.(0.68, 'Basic Pitch：全混音估計左手根音…')
+  let lhNotes: RawPitchNote[]
+  if (rhPlan.source === 'vocal') {
+    lhNotes = await runBasicPitch(model, audio, (p) => {
+      onProgress?.(0.68 + p * 0.22, 'Basic Pitch 推論 LH…')
+    })
+  } else {
+    // Same pass already tracked the mix — reuse RH notes for LH lows.
+    lhNotes = rhNotes
+  }
 
-  const raw: RawPitchNote[] = timed.map((n) => ({
-    startTimeSeconds: n.startTimeSeconds,
-    durationSeconds: Math.max(0.05, n.durationSeconds),
-    pitchMidi: Math.round(n.pitchMidi),
-    amplitude: n.amplitude,
-  }))
-
-  if (raw.length < 2) {
+  onProgress?.(0.92, '整理成右手單音＋左手強拍根音…')
+  const primary = rhNotes.length >= 2 ? rhNotes : lhNotes
+  if (primary.length < 2) {
     throw new Error('Basic Pitch 幾乎沒偵測到音符（錄音可能太短或太安靜）')
   }
 
-  return arrangeDirectionB(
-    raw,
+  const srcLabel =
+    rhPlan.source === 'vocal'
+      ? `偵測到偏人聲（信心 ${rhPlan.detect.confidence.toFixed(2)}）→ RH 只采人聲取向音軌`
+      : `未明顯偵測人聲（信心 ${rhPlan.detect.confidence.toFixed(2)}）→ RH 采器樂／主旋律`
+
+  return arrangeDirectionBParts({
+    rhNotes: rhNotes.length >= 2 ? rhNotes : lhNotes,
+    lhNotes,
     title,
-    durationSec,
-    'basic-pitch',
-    '已用 Basic Pitch 從這段錄音估計音高，再收成 RH 單音＋LH 強拍根音。混音／多軌原曲仍可能有出入。',
-  )
+    sourceDurationSec: durationSec,
+    analyzer: 'basic-pitch',
+    preferVocalRange: rhPlan.source === 'vocal',
+    analyzerNote: `${srcLabel}；LH 根音仍來自全混音。中置分離為啟發式（非 Demucs），混音／單聲道喇叭錄音仍可能有出入。`,
+  })
 }

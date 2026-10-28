@@ -84,7 +84,9 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
         <h1 className="headline">這是哪一首？</h1>
         <p className="lede">
           可用 AudD 自動填入歌名，<strong>一律可手動修改</strong>。確認後會用
-          <strong>同一段錄音</strong>跑 Basic Pitch，收成 RH 單音旋律＋LH 強拍根音（失敗則降級示範分析器並標示）。
+          <strong>同一段錄音</strong>抽出可彈素材：
+          <strong>有人聲 → 右手只采人聲；無人聲 → 采器樂主旋律</strong>
+          ；左手仍為強拍根音（Basic Pitch；失敗則降級示範分析器並標示）。
         </p>
       </div>
 
