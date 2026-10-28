@@ -47,21 +47,62 @@ npm run preview      # 預覽 dist/
 4. **跟彈** — 大虛擬鍵盤高亮；選 N 小節循環、放慢、RH/LH 靜音；譜面可關  
 5. **習慣** — 可選「今天練完這段了嗎？」
 
+## 歌曲辨識（AudD ＋ Cloudflare Worker）
+
+GitHub Pages **不能**把 AudD token 放進前端。流程：
+
+`瀏覽器錄音 → POST 音訊到你的 Worker → Worker 用 secret 呼叫 AudD → 回傳歌名`  
+歌名欄位**永遠可手動改**；沒設代理／失敗時降級 stub＋手輸，不擋跟彈。
+
+### 你需要手動做的事（一次性）
+
+1. 到 [AudD Dashboard](https://dashboard.audd.io/) 註冊，複製 API token（試用約 300 次／14 天，見 [定價](https://audd.io/pricing/)）。  
+2. 部署 Worker（token 只進 Cloudflare secret，**不要 commit**）：
+
+```bash
+cd workers/audd-proxy
+npm install
+npx wrangler login
+npx wrangler secret put AUDD_API_TOKEN   # 貼上 AudD token
+npm run deploy
+```
+
+記下 Worker URL，例如 `https://audd-proxy.<subdomain>.workers.dev`。細節見 `workers/audd-proxy/README.md`。
+
+3. 建置前端時帶入代理網址（**build-time** Vite 變數，不是 secret）：
+
+```bash
+# 本機
+VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pages
+
+# GitHub Pages CI：repo Settings → Secrets and variables → Actions → Variables
+#   Name:  VITE_AUDD_PROXY_URL
+#   Value: https://audd-proxy.<subdomain>.workers.dev
+# 然後 push main（或 workflow_dispatch）重建 Pages。
+```
+
+### 沒有 token／代理時
+
+- 不設 `VITE_AUDD_PROXY_URL` → stub 建議歌名＋手動編輯（完全可用）。  
+- 有設但 Worker／AudD 失敗 → UI 說明失敗原因，改 stub／手輸，仍可進練習。
+
 ## 什麼是真的、什麼是 stub
 
 | 能力 | 狀態 |
 | --- | --- |
 | 麥克風錄音（MediaRecorder） | **真實** |
-| 歌曲指紋／辨歌 API | **Stub** — 隨機建議歌名＋可編輯；清楚標註待接 ACRCloud / AudD / Shazam 等 |
+| 歌曲指紋／辨歌 | **AudD 經 Worker**（需你部署＋設 `VITE_AUDD_PROXY_URL`）；否則 **stub**；**歌名永遠可手動改** |
 | 音高 → RH/LH 編曲 | **Demo 分析器** — Web Audio 粗估 BPM／音高種子後，量化產出符合方向 B 的可練編曲（非 Basic Pitch） |
 | 虛擬鍵盤跟彈、循環、放慢、RH/LH、習慣勾選 | **真實 UI／邏輯** |
 | 預覽音色 | 簡易 Web Audio 合成（非真實鋼琴採樣） |
 | 對錯偵測 | **不做（v1）** |
 | 串流抓完整曲／PDF | **不做（v1）** |
 
-Stub 入口：
+相關檔案：
 
-- `src/audio/songIdStub.ts` — 歌名辨識  
+- `workers/audd-proxy/` — Cloudflare Worker  
+- `src/audio/songIdentify.ts` — 前端辨識（AudD → stub 降級）  
+- `src/audio/songIdStub.ts` — stub  
 - `src/audio/demoAnalyzer.ts` — 旋律／根音抽出  
 
 ## 換成 Basic Pitch（路徑）
@@ -75,11 +116,11 @@ Stub 入口：
 ## 技術
 
 - Vite + React 19 + TypeScript  
-- 純前端；無後端、無帳號  
+- 可選：Cloudflare Worker（AudD 代理）；無 Worker 時前端仍可完整跑 stub／手輸  
 
 ## CI／Deploy
 
-- **GitHub Pages：** `.github/workflows/pages.yml` — push `main` 建置 `dist/`、驗證、同步根目錄 publish 檔；並嘗試 `actions/deploy-pages`（需 Source = GitHub Actions）。  
+- **GitHub Pages：** `.github/workflows/pages.yml` — push `main` 建置 `dist/`（可讀 `vars.VITE_AUDD_PROXY_URL`）、驗證、同步根目錄 publish 檔；並嘗試 `actions/deploy-pages`。  
 - **AWS ECS：** `.github/workflows/aws.yml` 仍為 **僅 `workflow_dispatch`**；勿把 `MY_*` 佔位值加回 push 觸發。  
 
 ## 授權注意

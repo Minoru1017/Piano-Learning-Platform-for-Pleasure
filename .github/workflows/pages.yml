@@ -35,6 +35,10 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          # Optional: set repo Actions variable VITE_AUDD_PROXY_URL to your Worker URL.
+          # Never put AUDD_API_TOKEN here — that belongs in the Worker secret only.
+          VITE_AUDD_PROXY_URL: ${{ vars.VITE_AUDD_PROXY_URL }}
         run: npm run build
 
       - name: Verify production HTML (not Vite source)
