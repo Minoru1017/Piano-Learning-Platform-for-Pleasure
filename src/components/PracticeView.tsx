@@ -8,7 +8,8 @@ import {
   secondsToBeat,
   upcomingNotes,
 } from '../lib/timing'
-import type { Arrangement, LoopRange } from '../types/music'
+import type { Arrangement, LoopRange, NoteRole } from '../types/music'
+import { DEFAULT_LAYER_MUTE, ROLE_LABEL_ZH } from '../types/music'
 import { PianoKeyboard, type KeyHighlight } from './PianoKeyboard'
 
 interface PracticeViewProps {
@@ -18,11 +19,16 @@ interface PracticeViewProps {
 
 const SPEEDS = [0.5, 0.75, 1] as const
 
+const LAYER_ORDER: NoteRole[] = ['vocal', 'melody', 'bass', 'harmony', 'ornament']
+
 export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(0.75)
   const [muteRh, setMuteRh] = useState(false)
   const [muteLh, setMuteLh] = useState(false)
+  const [layerMute, setLayerMute] = useState<Record<NoteRole, boolean>>(() => ({
+    ...DEFAULT_LAYER_MUTE,
+  }))
   const [showSheet, setShowSheet] = useState(false)
   const [practicedToday, setPracticedToday] = useState(() => {
     try {
@@ -42,13 +48,26 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
   const playOriginRef = useRef<{ perf: number; beat: number } | null>(null)
   const soundingRef = useRef(new Set<string>())
 
-  const loopNotes = useMemo(() => notesInLoop(arrangement, loop), [arrangement, loop])
+  const presentRoles = useMemo(() => {
+    const set = new Set(arrangement.notes.map((n) => n.role))
+    return LAYER_ORDER.filter((r) => set.has(r))
+  }, [arrangement.notes])
+
+  const loopNotes = useMemo(() => {
+    const all = notesInLoop(arrangement, loop)
+    return all.filter((n) => {
+      if (layerMute[n.role]) return false
+      if (n.hand === 'rh' && muteRh) return false
+      if (n.hand === 'lh' && muteLh) return false
+      return true
+    })
+  }, [arrangement, loop, layerMute, muteRh, muteLh])
+
   const { startBeat, endBeat, lengthBeats } = useMemo(
     () => loopBeatSpan(loop, arrangement.beatsPerMeasure),
     [loop, arrangement.beatsPerMeasure],
   )
 
-  // Keep beat inside loop when loop changes
   useEffect(() => {
     setBeat((b) => {
       if (b < startBeat || b >= endBeat) return startBeat
@@ -96,17 +115,14 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-    // syncVoices closes over mute/loop; restart effect when those change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, speed, endBeat, startBeat, lengthBeats, arrangement.bpm, muteRh, muteLh, loopNotes])
+  }, [playing, speed, endBeat, startBeat, lengthBeats, arrangement.bpm, loopNotes])
 
   function syncVoices(atBeat: number) {
     const synth = synthRef.current
     const desired = new Set<string>()
     for (const n of activeNotesAt(loopNotes, atBeat)) {
-      if (n.hand === 'rh' && muteRh) continue
-      if (n.hand === 'lh' && muteLh) continue
-      const id = `${n.hand}:${n.startBeat}:${n.midi}`
+      const id = `${n.role}:${n.hand}:${n.startBeat}:${n.midi}`
       desired.add(id)
       if (!soundingRef.current.has(id)) {
         synth.noteOn(n.midi, n.hand, id)
@@ -124,8 +140,6 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
   const highlights: KeyHighlight[] = useMemo(() => {
     const list: KeyHighlight[] = []
     const add = (role: 'current' | 'upcoming', hand: 'rh' | 'lh') => {
-      if (hand === 'rh' && muteRh) return
-      if (hand === 'lh' && muteLh) return
       const notes =
         role === 'current'
           ? activeNotesAt(loopNotes, beat, hand)
@@ -139,7 +153,7 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
     add('current', 'rh')
     add('current', 'lh')
     return list
-  }, [loopNotes, beat, muteRh, muteLh])
+  }, [loopNotes, beat])
 
   const measure = beatToMeasure(beat, arrangement.beatsPerMeasure)
   const beatInMeasure = beat - measure * arrangement.beatsPerMeasure
@@ -171,11 +185,24 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
     })
   }
 
+  function toggleLayer(role: NoteRole) {
+    setLayerMute((m) => ({ ...m, [role]: !m[role] }))
+  }
+
   const sheetNotes = useMemo(() => {
     return [...loopNotes]
       .sort((a, b) => a.startBeat - b.startBeat || (a.hand === 'lh' ? -1 : 1))
       .slice(0, 48)
   }, [loopNotes])
+
+  const bpmLabel =
+    arrangement.bpmSource === 'audio-autocorr'
+      ? '音訊自相關'
+      : arrangement.bpmSource === 'onset-median'
+        ? '起音估計'
+        : arrangement.bpmSource === 'demo'
+          ? '示範'
+          : ''
 
   return (
     <section className="screen screen--practice">
@@ -184,7 +211,12 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
           <p className="brand brand--inline">跟彈</p>
           <h1 className="practice-title">{arrangement.title}</h1>
           <p className="practice-sub">
-            {arrangement.bpm} BPM · {arrangement.measureCount} 小節 ·{' '}
+            <span className="bpm-badge" title={bpmLabel || undefined}>
+              {arrangement.bpm} BPM
+            </span>
+            <span className="dot">·</span>
+            {arrangement.measureCount} 小節
+            <span className="dot">·</span>
             {arrangement.analyzer === 'demo' ? '示範分析器（非忠實轉譜）' : 'Basic Pitch'}
             <span className="dot">·</span>
             來源 {arrangement.sourceDurationSec.toFixed(1)}s 錄音
@@ -201,6 +233,10 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
               {arrangement.analyzerNote}
             </p>
           )}
+          <p className="stem-copy">
+            分層為瀏覽器內 best-effort 特徵化（頻段／中置／暫態），不是專業分軌。預設可彈組合＝人聲或主旋律
+            （RH）＋ BASS 根音（LH）；點綴預設關閉。
+          </p>
         </div>
         <button type="button" className="btn btn--ghost btn--small" onClick={onRestart}>
           新錄音
@@ -271,6 +307,32 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
         </div>
       </div>
 
+      {presentRoles.length > 0 && (
+        <div className="layer-controls" role="group" aria-label="分層開關">
+          <p className="layer-controls__label">鋼琴層</p>
+          <div className="layer-controls__chips">
+            {presentRoles.map((role) => {
+              const on = !layerMute[role]
+              const stem = arrangement.stems?.[role]
+              return (
+                <button
+                  key={role}
+                  type="button"
+                  className={`chip chip--layer ${on ? 'chip--on' : ''}`}
+                  onClick={() => toggleLayer(role)}
+                  aria-pressed={on}
+                  title={stem?.eqHint}
+                >
+                  {ROLE_LABEL_ZH[role]}
+                  {stem != null ? ` ${stem.presence.toFixed(2)}` : ''}
+                  {on ? '' : ' ·關'}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="loop-controls">
         <label className="loop-field">
           <span>起小節</span>
@@ -328,8 +390,9 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
           <p className="sheet__note">譜面為次要參考；跟彈以鍵盤高亮為主。v1 不做對錯偵測。</p>
           <ul className="sheet__list">
             {sheetNotes.map((n) => (
-              <li key={`${n.hand}-${n.startBeat}-${n.midi}`}>
+              <li key={`${n.role}-${n.hand}-${n.startBeat}-${n.midi}`}>
                 <span className={`hand-tag hand-tag--${n.hand}`}>{n.hand.toUpperCase()}</span>
+                <span className="role-tag">{ROLE_LABEL_ZH[n.role]}</span>
                 m{beatToMeasure(n.startBeat, 4) + 1} · beat{' '}
                 {(n.startBeat % 4) + 1} · MIDI {n.midi}
               </li>

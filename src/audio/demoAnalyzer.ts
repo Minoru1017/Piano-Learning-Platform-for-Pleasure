@@ -139,6 +139,7 @@ export async function analyzeRecordingDemo(
       startBeat: m * 4,
       durationBeats: 1.5,
       hand: 'lh',
+      role: 'bass',
     })
     if (rand() > 0.35) {
       notes.push({
@@ -146,6 +147,7 @@ export async function analyzeRecordingDemo(
         startBeat: m * 4 + 2,
         durationBeats: 1.5,
         hand: 'lh',
+        role: 'bass',
       })
     }
 
@@ -168,6 +170,7 @@ export async function analyzeRecordingDemo(
         startBeat: m * 4 + slot,
         durationBeats: slot % 1 === 0 ? 0.9 : 0.45,
         hand: 'rh',
+        role: 'melody',
       })
     }
   }
@@ -175,6 +178,7 @@ export async function analyzeRecordingDemo(
   return {
     title,
     bpm,
+    bpmSource: 'demo',
     beatsPerMeasure: 4,
     measureCount,
     notes,
