@@ -98,6 +98,7 @@ export async function analyzeRecordingBasicPitch(
   title: string,
   durationSecFallback: number,
   onProgress?: ProgressCb,
+  musicStartOffsetSec = 0,
 ): Promise<Arrangement> {
   onProgress?.(0.04, '載入 Basic Pitch 模型…')
   const model = await getModel()
@@ -152,18 +153,24 @@ export async function analyzeRecordingBasicPitch(
     `點綴 ${stems.ornament.presence.toFixed(2)}`,
   ].join(' · ')
 
+  const onsetNote =
+    musicStartOffsetSec > 0.05
+      ? `小節 1＝音樂起點（已裁切開頭靜音 ${musicStartOffsetSec.toFixed(2)}s）；`
+      : `小節 1＝音樂起點（開頭靜音已去除）；`
+
   return arrangeDirectionBParts({
     rhNotes: rhNotes.length >= 2 ? rhNotes : mixNotes,
     lhNotes: mixNotes,
     mixNotes,
     title,
     sourceDurationSec: durationSec,
+    musicStartOffsetSec,
     analyzer: 'basic-pitch',
     preferVocalRange: rhPlan.source === 'vocal',
     rhRole,
     bpm: bpmResult.bpm,
     bpmSource: bpmResult.source,
     stems,
-    analyzerNote: `${srcLabel}；BPM ${bpmResult.bpm}（信心 ${bpmResult.confidence.toFixed(2)}）。分層為頻段／中置／暫態啟發式（非 Demucs）：${stemBrief}。混音特徵僅作進譜閘，非專業分軌；點綴預設關閉。`,
+    analyzerNote: `${onsetNote}${srcLabel}；BPM ${bpmResult.bpm}（信心 ${bpmResult.confidence.toFixed(2)}）。分層為頻段／中置／暫態啟發式（非 Demucs）：${stemBrief}。混音特徵僅作進譜閘，非專業分軌；點綴預設關閉。`,
   })
 }

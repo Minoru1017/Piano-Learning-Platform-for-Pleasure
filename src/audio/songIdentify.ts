@@ -2,6 +2,7 @@
  * Song identification: AudD via Cloudflare Worker when configured,
  * otherwise stub + manual title (always editable in the UI).
  */
+import { sliceBlobForIdentify } from './cleanCapture'
 import { identifySongStub } from './songIdStub'
 
 export type SongIdConfidence = 'audd' | 'audd-nomatch' | 'stub' | 'fallback'
@@ -103,7 +104,9 @@ export async function identifySong(
   }
 
   try {
-    return await identifyViaAuddProxy(base, audioBlob)
+    // Full songs can exceed AudD size limits — fingerprint a short music head slice.
+    const clip = await sliceBlobForIdentify(audioBlob, 15)
+    return await identifyViaAuddProxy(base, clip)
   } catch (e) {
     const stub = await identifySongStub(audioBlob, durationSec)
     const reason = e instanceof Error ? e.message : '未知錯誤'

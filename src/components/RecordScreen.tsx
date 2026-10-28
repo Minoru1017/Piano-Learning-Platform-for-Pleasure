@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { MicRecorder, type RecordingResult } from '../audio/recorder'
+import {
+  AudioCapture,
+  displayAudioSupported,
+  MAX_RECORDING_SEC,
+  type CaptureMode,
+  type RecordingResult,
+} from '../audio/recorder'
 import { SoftEqCurve } from './SoftEqCurve'
 
 interface RecordScreenProps {
@@ -9,12 +15,15 @@ interface RecordScreenProps {
 }
 
 export function RecordScreen({ onRecorded, onLoadDemo }: RecordScreenProps) {
+  const [mode, setMode] = useState<CaptureMode>('mic')
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const recorderRef = useRef<MicRecorder | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
+  const recorderRef = useRef<AudioCapture | null>(null)
   const tickRef = useRef<number | null>(null)
+  const displayOk = displayAudioSupported()
 
   useEffect(() => {
     return () => {
@@ -23,38 +32,65 @@ export function RecordScreen({ onRecorded, onLoadDemo }: RecordScreenProps) {
     }
   }, [])
 
+  function clearTick() {
+    if (tickRef.current) {
+      window.clearInterval(tickRef.current)
+      tickRef.current = null
+    }
+  }
+
   async function start() {
     setError(null)
+    setInfo(null)
     setBusy(true)
     try {
-      const rec = new MicRecorder()
+      const rec = new AudioCapture()
       recorderRef.current = rec
-      await rec.start()
+      rec.setMaxDurationHandler(() => {
+        void stop(true)
+      })
+      if (mode === 'display') {
+        await rec.startDisplay()
+        setInfo('正在擷取分頁／系統音訊。耳機聽歌也可錄——請確認已勾選分享音訊。')
+      } else {
+        await rec.startMic()
+      }
       setRecording(true)
       setElapsed(0)
       tickRef.current = window.setInterval(() => {
-        setElapsed((e) => e + 0.1)
+        setElapsed((e) => {
+          const next = e + 0.1
+          if (next >= MAX_RECORDING_SEC) {
+            void stop(true)
+          }
+          return next
+        })
       }, 100)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '無法開啟麥克風')
+      setError(e instanceof Error ? e.message : '無法開始錄音')
+      recorderRef.current?.cancel()
+      recorderRef.current = null
     } finally {
       setBusy(false)
     }
   }
 
-  async function stop() {
+  async function stop(hitMax = false) {
+    if (!recorderRef.current) return
     setBusy(true)
-    if (tickRef.current) {
-      window.clearInterval(tickRef.current)
-      tickRef.current = null
-    }
+    clearTick()
     try {
-      const result = await recorderRef.current!.stop()
+      const result = await recorderRef.current.stop()
+      recorderRef.current = null
       setRecording(false)
+      if (hitMax) {
+        setInfo(`已達安全上限 ${MAX_RECORDING_SEC / 60} 分鐘，自動停止並保留完整音樂段。`)
+      }
       onRecorded(result)
     } catch (e) {
       setError(e instanceof Error ? e.message : '停止錄音失敗')
       setRecording(false)
+      recorderRef.current = null
     } finally {
       setBusy(false)
     }
@@ -66,6 +102,8 @@ export function RecordScreen({ onRecorded, onLoadDemo }: RecordScreenProps) {
       )
     : [0.2, 0.28, 0.32, 0.3, 0.26, 0.22, 0.2, 0.24]
 
+  const maxMin = MAX_RECORDING_SEC / 60
+
   return (
     <section className="screen screen--record">
       <div className="record-layout">
@@ -74,15 +112,49 @@ export function RecordScreen({ onRecorded, onLoadDemo }: RecordScreenProps) {
           <p className="brand">跟彈</p>
           <h1 className="headline">坐在白鋼琴旁，環境隨情緒呼吸</h1>
           <p className="lede">
-            錄下正在聽或哼的片段，辨出歌名後，從同一段錄音抽出右手旋律與左手根音；跟彈時周圍的光與霧會隨音符輕輕改變。
+            錄下整首歌（或你要的長度）；開頭靜音與底噪會自動裁切，小節 1 對齊音樂起點。可用麥克風，或用螢幕／分頁音訊在耳機聽歌時擷取。
           </p>
         </div>
 
         <div className="record-hero">
+          <div className="capture-mode" role="group" aria-label="錄音來源">
+            <p className="section-label">錄音來源</p>
+            <div className="layer-controls__chips">
+              <button
+                type="button"
+                className={`chip ${mode === 'mic' ? 'chip--on' : ''}`}
+                disabled={recording || busy}
+                onClick={() => setMode('mic')}
+                aria-pressed={mode === 'mic'}
+              >
+                麥克風
+              </button>
+              <button
+                type="button"
+                className={`chip ${mode === 'display' ? 'chip--on' : ''}`}
+                disabled={recording || busy || !displayOk}
+                onClick={() => setMode('display')}
+                aria-pressed={mode === 'display'}
+                title={
+                  displayOk
+                    ? 'Chrome／Edge：分享分頁並勾選音訊'
+                    : '此瀏覽器不支援 getDisplayMedia'
+                }
+              >
+                螢幕／分頁音訊
+              </button>
+            </div>
+            <p className="record-meta">
+              {mode === 'mic'
+                ? '麥克風：適合喇叭外放；請靠近音源。通話降噪／AGC 已關閉。'
+                : '螢幕／分頁音訊：適合耳機聽歌。Chrome／Edge 請選分頁並勾選「分享分頁音訊」；Safari 多半無音軌，請改麥克風。'}
+            </p>
+          </div>
+
           <button
             type="button"
             className={`record-btn ${recording ? 'record-btn--live' : ''}`}
-            onClick={() => void (recording ? stop() : start())}
+            onClick={() => void (recording ? stop(false) : start())}
             disabled={busy}
             aria-pressed={recording}
           >
@@ -95,9 +167,14 @@ export function RecordScreen({ onRecorded, onLoadDemo }: RecordScreenProps) {
           <SoftEqCurve values={idleCurve} label="Listening field" />
           <p className="record-meta" aria-live="polite">
             {recording
-              ? `錄音中 ${elapsed.toFixed(1)}s — 建議 10–30 秒`
-              : '不會上傳到串流曲庫；只用這次錄音本身抽旋律'}
+              ? `錄音中 ${formatClock(elapsed)} — 可錄完整曲（安全上限 ${maxMin} 分鐘）；停止後會去掉開頭／尾端靜音與底噪`
+              : `完整長度保留（上限 ${maxMin} 分鐘）。不會把房間底噪當音符；AudD 只用開頭一小段辨歌。`}
           </p>
+          {info && (
+            <p className="stub-banner stub-banner--ok" role="status">
+              {info}
+            </p>
+          )}
           {error && <p className="error">{error}</p>}
           {onLoadDemo && (
             <button type="button" className="btn btn--ghost" onClick={onLoadDemo}>
@@ -108,4 +185,11 @@ export function RecordScreen({ onRecorded, onLoadDemo }: RecordScreenProps) {
       </div>
     </section>
   )
+}
+
+function formatClock(sec: number): string {
+  const s = Math.floor(sec)
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  return `${m}:${r.toString().padStart(2, '0')}`
 }

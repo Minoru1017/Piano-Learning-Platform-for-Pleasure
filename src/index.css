@@ -276,6 +276,12 @@ input {
   gap: 1.35rem;
 }
 
+.capture-mode {
+  width: 100%;
+  max-width: 28rem;
+  margin-bottom: 0.25rem;
+}
+
 .record-layout {
   display: grid;
   gap: 2rem;

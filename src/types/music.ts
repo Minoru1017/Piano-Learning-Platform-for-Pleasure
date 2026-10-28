@@ -51,8 +51,10 @@ export interface Arrangement {
   analyzer: 'demo' | 'basic-pitch'
   /** Traditional Chinese note shown in practice UI (honest labeling). */
   analyzerNote?: string
-  /** Seconds of source recording used. */
+  /** Seconds of source recording used (after silence trim; t=0 ≈ music start). */
   sourceDurationSec: number
+  /** Seconds trimmed before musical onset in the raw capture (0 if already aligned). */
+  musicStartOffsetSec?: number
   /** Best-effort stem characterization metadata (v1.5). */
   stems?: StemCharacterization
 }

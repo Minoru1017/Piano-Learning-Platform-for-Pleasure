@@ -255,7 +255,14 @@ export function PracticeView({ arrangement, onRestart, onAtmosphere }: PracticeV
             <span className="dot">·</span>
             {arrangement.analyzer === 'demo' ? '示範分析器（非忠實轉譜）' : 'Basic Pitch'}
             <span className="dot">·</span>
-            來源 {arrangement.sourceDurationSec.toFixed(1)}s 錄音
+            來源 {arrangement.sourceDurationSec.toFixed(1)}s 音樂
+            {arrangement.musicStartOffsetSec != null &&
+              arrangement.musicStartOffsetSec > 0.05 && (
+                <>
+                  <span className="dot">·</span>
+                  小節 1＝起點（裁前靜音 {arrangement.musicStartOffsetSec.toFixed(1)}s）
+                </>
+              )}
           </p>
           {arrangement.analyzerNote && (
             <p
