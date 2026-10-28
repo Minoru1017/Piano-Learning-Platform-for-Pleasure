@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PreviewSynth } from '../audio/synth'
 import {
+  emotionFromNotes,
+  IDLE_ATMOSPHERE,
+  type AtmosphereEmotion,
+} from '../lib/atmosphereEmotion'
+import {
   activeNotesAt,
   beatToMeasure,
   loopBeatSpan,
@@ -11,17 +16,19 @@ import {
 import type { Arrangement, LoopRange, NoteRole } from '../types/music'
 import { DEFAULT_LAYER_MUTE, ROLE_LABEL_ZH } from '../types/music'
 import { PianoKeyboard, type KeyHighlight } from './PianoKeyboard'
+import { SoftEqCurve } from './SoftEqCurve'
 
 interface PracticeViewProps {
   arrangement: Arrangement
   onRestart: () => void
+  onAtmosphere?: (emotion: AtmosphereEmotion) => void
 }
 
 const SPEEDS = [0.5, 0.75, 1] as const
 
 const LAYER_ORDER: NoteRole[] = ['vocal', 'melody', 'bass', 'harmony', 'ornament']
 
-export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
+export function PracticeView({ arrangement, onRestart, onAtmosphere }: PracticeViewProps) {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(0.75)
   const [muteRh, setMuteRh] = useState(false)
@@ -47,6 +54,8 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
   const rafRef = useRef<number | null>(null)
   const playOriginRef = useRef<{ perf: number; beat: number } | null>(null)
   const soundingRef = useRef(new Set<string>())
+  const onAtmosphereRef = useRef(onAtmosphere)
+  onAtmosphereRef.current = onAtmosphere
 
   const presentRoles = useMemo(() => {
     const set = new Set(arrangement.notes.map((n) => n.role))
@@ -68,6 +77,25 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
     [loop, arrangement.beatsPerMeasure],
   )
 
+  const layerCurve = useMemo(() => {
+    const stems = arrangement.stems
+    if (!stems) {
+      return [0.35, 0.45, 0.4, 0.3, 0.25, 0.35, 0.5, 0.42]
+    }
+    return [
+      stems.bass.presence,
+      stems.vocal.presence,
+      stems.melody.presence,
+      stems.harmony.presence,
+      stems.ornament.presence,
+      (stems.bass.presence + stems.melody.presence) / 2,
+      stems.vocal.presence * 0.8 + 0.1,
+      stems.melody.presence * 0.7 + 0.15,
+    ]
+  }, [arrangement.stems])
+
+  const bpmNorm = Math.min(1, Math.max(0.15, (arrangement.bpm - 70) / 90))
+
   useEffect(() => {
     setBeat((b) => {
       if (b < startBeat || b >= endBeat) return startBeat
@@ -80,8 +108,16 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       synth.dispose()
+      onAtmosphereRef.current?.(IDLE_ATMOSPHERE)
     }
   }, [])
+
+  // Drive atmosphere from active notes while following
+  useEffect(() => {
+    const active = activeNotesAt(loopNotes, beat)
+    const next = playing ? emotionFromNotes(active) : IDLE_ATMOSPHERE
+    onAtmosphereRef.current?.(next)
+  }, [beat, loopNotes, playing])
 
   useEffect(() => {
     if (!playing) {
@@ -234,14 +270,92 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
             </p>
           )}
           <p className="stem-copy">
-            分層為瀏覽器內 best-effort 特徵化（頻段／中置／暫態），不是專業分軌。預設可彈組合＝人聲或主旋律
-            （RH）＋ BASS 根音（LH）；點綴預設關閉。
+            白鋼琴旁跟彈：環境光霧會隨當下音符情緒（音高／分層）輕輕變化。分層為 best-effort
+            特徵化，非專業分軌。
           </p>
         </div>
         <button type="button" className="btn btn--ghost btn--small" onClick={onRestart}>
           新錄音
         </button>
       </header>
+
+      <div className="practice-panel">
+        <div className="practice-meta-row">
+          <SoftEqCurve
+            values={[bpmNorm * 0.5, bpmNorm * 0.7, bpmNorm, bpmNorm * 0.85, bpmNorm * 0.6, bpmNorm * 0.75, bpmNorm * 0.9, bpmNorm]}
+            label={`Tempo · ${arrangement.bpm} BPM`}
+          />
+          <SoftEqCurve values={layerCurve} label="Layers · presence" />
+        </div>
+
+        {presentRoles.length > 0 && (
+          <div className="layer-controls" role="group" aria-label="分層開關">
+            <p className="layer-controls__label">鋼琴層</p>
+            <div className="layer-controls__chips">
+              {presentRoles.map((role) => {
+                const on = !layerMute[role]
+                const stem = arrangement.stems?.[role]
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    className={`chip chip--layer ${on ? 'chip--on' : ''}`}
+                    onClick={() => toggleLayer(role)}
+                    aria-pressed={on}
+                    title={stem?.eqHint}
+                  >
+                    {ROLE_LABEL_ZH[role]}
+                    {stem != null ? ` ${stem.presence.toFixed(2)}` : ''}
+                    {on ? '' : ' ·關'}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="transport">
+          <button
+            type="button"
+            className="btn btn--primary btn--play"
+            onClick={() => setPlaying((p) => !p)}
+          >
+            {playing ? '暫停' : '播放'}
+          </button>
+
+          <div className="control-group" role="group" aria-label="速度">
+            {SPEEDS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`chip ${speed === s ? 'chip--on' : ''}`}
+                onClick={() => setSpeed(s)}
+              >
+                {s === 1 ? '原速' : `${s}×`}
+              </button>
+            ))}
+          </div>
+
+          <div className="control-group" role="group" aria-label="左右手">
+            <button
+              type="button"
+              className={`chip ${!muteRh ? 'chip--on' : ''}`}
+              onClick={() => setMuteRh((m) => !m)}
+              aria-pressed={!muteRh}
+            >
+              RH {muteRh ? '靜音' : '開'}
+            </button>
+            <button
+              type="button"
+              className={`chip ${!muteLh ? 'chip--on' : ''}`}
+              onClick={() => setMuteLh((m) => !m)}
+              aria-pressed={!muteLh}
+            >
+              LH {muteLh ? '靜音' : '開'}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="practice-hero">
         <div className="measure-readout" aria-live="polite">
@@ -265,75 +379,8 @@ export function PracticeView({ arrangement, onRestart }: PracticeViewProps) {
         </div>
       </div>
 
-      <div className="transport">
-        <button
-          type="button"
-          className="btn btn--primary btn--play"
-          onClick={() => setPlaying((p) => !p)}
-        >
-          {playing ? '暫停' : '播放'}
-        </button>
-
-        <div className="control-group" role="group" aria-label="速度">
-          {SPEEDS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`chip ${speed === s ? 'chip--on' : ''}`}
-              onClick={() => setSpeed(s)}
-            >
-              {s === 1 ? '原速' : `${s}×`}
-            </button>
-          ))}
-        </div>
-
-        <div className="control-group" role="group" aria-label="左右手">
-          <button
-            type="button"
-            className={`chip ${!muteRh ? 'chip--on' : ''}`}
-            onClick={() => setMuteRh((m) => !m)}
-            aria-pressed={!muteRh}
-          >
-            RH {muteRh ? '靜音' : '開'}
-          </button>
-          <button
-            type="button"
-            className={`chip ${!muteLh ? 'chip--on' : ''}`}
-            onClick={() => setMuteLh((m) => !m)}
-            aria-pressed={!muteLh}
-          >
-            LH {muteLh ? '靜音' : '開'}
-          </button>
-        </div>
-      </div>
-
-      {presentRoles.length > 0 && (
-        <div className="layer-controls" role="group" aria-label="分層開關">
-          <p className="layer-controls__label">鋼琴層</p>
-          <div className="layer-controls__chips">
-            {presentRoles.map((role) => {
-              const on = !layerMute[role]
-              const stem = arrangement.stems?.[role]
-              return (
-                <button
-                  key={role}
-                  type="button"
-                  className={`chip chip--layer ${on ? 'chip--on' : ''}`}
-                  onClick={() => toggleLayer(role)}
-                  aria-pressed={on}
-                  title={stem?.eqHint}
-                >
-                  {ROLE_LABEL_ZH[role]}
-                  {stem != null ? ` ${stem.presence.toFixed(2)}` : ''}
-                  {on ? '' : ' ·關'}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       <div className="loop-controls">
+        <p className="section-label">小節循環</p>
         <label className="loop-field">
           <span>起小節</span>
           <input

@@ -80,7 +80,7 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
   return (
     <section className="screen screen--identify">
       <div className="brand-block brand-block--compact">
-        <p className="atelier-mark">Florence · Cristofori atelier</p>
+        <p className="atelier-mark">White piano · soft crystal</p>
         <p className="brand">跟彈</p>
         <h1 className="headline">這是哪一首？</h1>
         <p className="lede">
