@@ -5,9 +5,10 @@
 ## 流程
 
 1. `analyzeRecording()` 優先呼叫 `basicPitchAnalyzer.ts`
-2. **重採樣為 mono @ 22050 Hz**（`resample.ts`）— mic 常為 44100/48000，否則 BP 會丟錯
-3. 模型輸出 → `arrangeFromPitch.ts` 收成 Direction B：RH 單音量化、LH 僅強拍根音
-4. 失敗則降級 `demoAnalyzer.ts`，並在 UI 標示「示範分析器」
+2. `vocalPrefer.ts`：啟發式判斷人聲 → RH 用中置＋中頻 stem，否則全混音主旋律；LH 仍跟全混音
+3. **重採樣為 mono @ 22050 Hz**（`resample.ts`）— mic 常為 44100/48000，否則 BP 會丟錯
+4. 模型輸出 → `arrangeFromPitch.ts` 收成 Direction B：RH 單音量化、LH 僅強拍根音
+5. 失敗則降級 `demoAnalyzer.ts`，並在 UI 標示「示範分析器」
 
 Regression: `npm run test:resample`
 

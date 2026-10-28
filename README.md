@@ -92,7 +92,7 @@ VITE_AUDD_PROXY_URL=https://audd-proxy.<subdomain>.workers.dev npm run build:pag
 | --- | --- |
 | 麥克風錄音（MediaRecorder） | **真實**（音樂取向：關通話 DSP；錄音後峰值正規化） |
 | 歌曲指紋／辨歌 | **AudD 經 Worker**（需你部署＋設 `VITE_AUDD_PROXY_URL`）；否則 **stub**；**歌名永遠可手動改** |
-| 音高 → RH/LH 編曲 | **Basic Pitch（瀏覽器 TFJS WASM）** → 收成 RH 單音＋LH 強拍根音；失敗則 **示範分析器**並在 UI 標示 |
+| 音高 → RH/LH 編曲 | **Basic Pitch（瀏覽器 TFJS WASM）**；RH **優先人聲否則主旋律**；LH 強拍根音；失敗則 **示範分析器**並標示 |
 | 虛擬鍵盤跟彈、循環、放慢、RH/LH、習慣勾選 | **真實 UI／邏輯** |
 | 預覽音色 | 簡易 Web Audio 合成（非真實鋼琴採樣） |
 | 對錯偵測 | **不做（v1）** |
