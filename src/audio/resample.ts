@@ -59,8 +59,10 @@ export function toBasicPitchAudioBuffer(buffer: AudioBuffer): AudioBuffer {
   const samples = resampleLinear(mono, buffer.sampleRate, BASIC_PITCH_SAMPLE_RATE)
 
   // createBuffer allows an explicit sampleRate independent of the context's rate.
-  const ctx = new OfflineAudioContext(1, Math.max(1, samples.length), BASIC_PITCH_SAMPLE_RATE)
-  const out = ctx.createBuffer(1, Math.max(1, samples.length), BASIC_PITCH_SAMPLE_RATE)
-  out.copyToChannel(samples, 0)
+  const len = Math.max(1, samples.length)
+  const ctx = new OfflineAudioContext(1, len, BASIC_PITCH_SAMPLE_RATE)
+  const out = ctx.createBuffer(1, len, BASIC_PITCH_SAMPLE_RATE)
+  // Copy via getChannelData to avoid Float32Array<ArrayBufferLike> vs ArrayBuffer mismatch.
+  out.getChannelData(0).set(samples)
   return out
 }
