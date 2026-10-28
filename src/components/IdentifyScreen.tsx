@@ -81,7 +81,21 @@ export function IdentifyScreen({ recording, onReady, onBack }: IdentifyScreenPro
       </div>
 
       <div className="identify-panel">
-        <audio className="playback-audio" src={recording.objectUrl} controls />
+        <audio
+          className="playback-audio"
+          src={recording.objectUrl}
+          controls
+          preload="auto"
+          // Explicit full volume — quietness was from the mic signal, not the element.
+          ref={(el) => {
+            if (el) el.volume = 1
+          }}
+        />
+        {recording.normalizeGain != null && recording.normalizeGain > 1.05 && (
+          <p className="record-meta">
+            已將預覽音量峰值正規化（×{recording.normalizeGain.toFixed(1)}）；錄音仍關閉通話降噪／AGC。
+          </p>
+        )}
         <label className="field">
           <span className="field__label">歌名（可手動編輯）</span>
           <input

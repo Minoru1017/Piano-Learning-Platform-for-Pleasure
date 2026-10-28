@@ -1,8 +1,12 @@
+import { peakNormalizeBlob } from './normalize'
+
 export interface RecordingResult {
   blob: Blob
   objectUrl: string
   durationSec: number
   mimeType: string
+  /** Makeup gain applied after capture (1 = none). */
+  normalizeGain?: number
 }
 
 /** Prefer Opus in WebM; fall back for Safari / older browsers. */
@@ -95,12 +99,16 @@ export class MicRecorder {
 
     this.teardownStream()
     const durationSec = Math.max(0.5, (performance.now() - this.startedAt) / 1000)
-    const objectUrl = URL.createObjectURL(blob)
+
+    // AGC stays off for music; peak-normalize so preview / AudD aren't tiny.
+    const normalized = await peakNormalizeBlob(blob)
+    const objectUrl = URL.createObjectURL(normalized.blob)
     return {
-      blob,
+      blob: normalized.blob,
       objectUrl,
       durationSec,
-      mimeType: blob.type,
+      mimeType: normalized.blob.type,
+      normalizeGain: normalized.gain,
     }
   }
 
