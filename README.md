@@ -5,7 +5,20 @@
 
 產品規格見專案文件（Agent Store）：`docs/mvp-spec.md`。
 
-## 怎麼跑
+## 線上預覽（GitHub Pages）
+
+預期網址：
+
+**https://minoru1017.github.io/Piano-Learning-Platform-for-Pleasure/**
+
+（repo：`Minoru1017/Piano-Learning-Platform-for-Pleasure`；Vite `base` 已設為 `/Piano-Learning-Platform-for-Pleasure/`。）
+
+合併到 `main` 後，Actions 工作流程 **Deploy GitHub Pages** 會建置並部署。  
+**第一次**請到 repo **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**（若尚未選）。之後 push `main` 會自動更新站點。
+
+本 app 無 client router（單頁狀態切換），不需 `404.html`／hash router。
+
+## 怎麼跑（本機）
 
 ```bash
 npm install
@@ -16,7 +29,7 @@ npm run dev
 需允許**麥克風權限**才能走完整流程。
 
 ```bash
-npm run build    # 型別檢查 + 正式建置
+npm run build    # 型別檢查 + 正式建置（含 Pages base path）
 npm run preview  # 預覽建置結果
 ```
 
@@ -60,9 +73,9 @@ Stub 入口：
 
 ## CI／Deploy
 
-- MVP **不需要** AWS ECS。  
-- `.github/workflows/aws.yml` 已改為 **僅 `workflow_dispatch`（手動）**，不再在 push／PR 執行，也不再使用 `MY_*` 佔位值。  
-- 日後若要 ECS：先備妥 Dockerfile、task definition，再於 repo Variables／Secrets 填入 `AWS_REGION`、`ECR_REPOSITORY`、`ECS_*`、`CONTAINER_NAME` 與 AWS access key（見該 workflow 註解）。
+- **GitHub Pages：** `.github/workflows/pages.yml` — push `main`（或手動 `workflow_dispatch`）建置並部署。  
+- **AWS ECS：** `.github/workflows/aws.yml` 仍為 **僅 `workflow_dispatch`**；MVP 不需要，也不會在 push／PR 自動跑。勿把 `MY_*` 佔位值加回 push 觸發。  
+- 日後若要 ECS：先備妥 Dockerfile、task definition，再於 repo Variables／Secrets 填入設定（見該 workflow 註解）。
 
 ## 授權注意
 
