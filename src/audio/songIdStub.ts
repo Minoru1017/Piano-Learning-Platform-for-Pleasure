@@ -1,12 +1,9 @@
 /**
- * Stub song recognizer.
- *
- * TODO: Swap in a real fingerprint / music-ID API (e.g. ACRCloud, AudD, ShazamKit)
- * when API keys are available. Keep the same interface so the UX loop stays intact.
+ * Local stub song recognizer (no API).
+ * Used when AudD proxy is unset or fails — UI always allows manual title edit.
  */
 
-export interface SongIdResult {
-  /** Suggested title; user can edit. */
+export interface StubSongIdResult {
   suggestedTitle: string
   confidence: 'stub'
   note: string
@@ -23,13 +20,12 @@ const DEMO_TITLES = [
 export async function identifySongStub(
   _audioBlob: Blob,
   durationSec: number,
-): Promise<SongIdResult> {
-  // Simulate network latency of a real ID API without blocking forever.
-  await new Promise((r) => setTimeout(r, 600 + Math.min(800, durationSec * 40)))
+): Promise<StubSongIdResult> {
+  await new Promise((r) => setTimeout(r, 400 + Math.min(600, durationSec * 30)))
   const idx = Math.floor(Math.random() * DEMO_TITLES.length)
   return {
     suggestedTitle: DEMO_TITLES[idx]!,
     confidence: 'stub',
-    note: '目前為 stub 辨識（無 API key）。請確認或手動修改歌名。',
+    note: '目前為 stub 辨識（無 AudD 代理）。請確認或手動修改歌名。',
   }
 }

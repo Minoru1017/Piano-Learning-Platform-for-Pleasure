@@ -280,6 +280,16 @@ input {
   line-height: 1.5;
 }
 
+.stub-banner--ok {
+  border-left-color: var(--accent);
+  background: rgba(15, 110, 106, 0.1);
+}
+
+.stub-banner--warn {
+  border-left-color: #b45309;
+  background: rgba(180, 83, 9, 0.12);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

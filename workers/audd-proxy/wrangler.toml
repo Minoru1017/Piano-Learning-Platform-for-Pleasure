@@ -1,0 +1,8 @@
+name = "audd-proxy"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Set the AudD token as a Worker secret (never commit it):
+#   npx wrangler secret put AUDD_API_TOKEN
+#
+# Optional: bind a custom route later in the Cloudflare dashboard.
